@@ -1,16 +1,17 @@
 
 import React, { useState } from 'react';
-import type { GeneratedNews } from '../types';
+import type { GeneratedNews, User } from '../types';
 
 interface UserDashboardProps {
+  user: User;
   credits: number;
   history: GeneratedNews[];
   onBack: () => void;
   onOpenPro: () => void;
-  onOpenAdmin: () => void; // Backdoor to admin for demo
+  onOpenAdmin: () => void;
 }
 
-const UserDashboard: React.FC<UserDashboardProps> = ({ credits, history, onBack, onOpenPro, onOpenAdmin }) => {
+const UserDashboard: React.FC<UserDashboardProps> = ({ user, credits, history, onBack, onOpenPro, onOpenAdmin }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'settings'>('overview');
 
   const renderOverview = () => (
@@ -106,26 +107,25 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ credits, history, onBack,
     <div className="space-y-6 animate-fade-in">
        <h3 className="text-xl font-bold text-white mb-4">Configurações da Conta</h3>
        
-       <div className="bg-black border border-green-900/30 rounded-xl p-6 space-y-4 opacity-75 pointer-events-none">
+       <div className="bg-black border border-green-900/30 rounded-xl p-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
              <div>
                <label className="block text-[10px] text-green-500 uppercase mb-1 font-bold tracking-wider">Nome de Usuário</label>
-               <input type="text" value="Visitante Demo" className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-gray-400 font-mono text-sm" readOnly />
+               <input type="text" value={user.name} className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-gray-400 font-mono text-sm" readOnly />
              </div>
              <div>
                <label className="block text-[10px] text-green-500 uppercase mb-1 font-bold tracking-wider">Email</label>
-               <input type="email" value="usuario@exemplo.com" className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-gray-400 font-mono text-sm" readOnly />
+               <input type="email" value={user.email} className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-gray-400 font-mono text-sm" readOnly />
              </div>
           </div>
-          <button className="bg-gray-900 text-gray-500 px-4 py-2 rounded text-xs uppercase border border-gray-800">Alterar Credenciais (Simulado)</button>
        </div>
 
        <div className="bg-black border border-green-900/30 rounded-xl p-6">
          <h4 className="text-white font-bold mb-2">Assinatura</h4>
          <div className="flex justify-between items-center">
            <div>
-             <p className="text-gray-400 text-sm">Plano Atual: <span className="text-white font-bold">Free Tier</span></p>
-             <p className="text-gray-600 text-xs font-mono">Status: ATIVO</p>
+             <p className="text-gray-400 text-sm">Plano Atual: <span className="text-white font-bold">{user.plan}</span></p>
+             <p className="text-gray-600 text-xs font-mono uppercase">Status: {user.status || 'Ativo'}</p>
            </div>
            <button onClick={onOpenPro} className="text-green-400 hover:text-green-300 text-xs font-bold border border-green-500/30 hover:border-green-500 px-4 py-2 rounded transition uppercase tracking-wider">
              Fazer Upgrade
@@ -133,15 +133,17 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ credits, history, onBack,
          </div>
        </div>
        
-       {/* Superadmin Access (Secret for Demo) */}
-       <div className="mt-12 pt-6 border-t border-gray-900">
-         <button onClick={onOpenAdmin} className="text-xs text-gray-700 hover:text-green-600 flex items-center gap-1 transition font-mono uppercase">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3 h-3">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-            </svg>
-            [ROOT ACCESS]
-         </button>
-       </div>
+       {/* Admin Dashboard Access */}
+       {user.role === 'admin' && (
+           <div className="mt-12 pt-6 border-t border-gray-900">
+             <button onClick={onOpenAdmin} className="text-xs text-red-500 hover:text-red-400 flex items-center gap-2 transition font-mono uppercase border border-red-900/30 px-4 py-2 rounded bg-red-900/10">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                </svg>
+                Acessar Painel Super Admin
+             </button>
+           </div>
+       )}
     </div>
   );
 
@@ -158,7 +160,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ credits, history, onBack,
             <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Painel do Usuário</h1>
           </div>
           <div className="hidden md:block text-xs text-green-900 font-mono bg-green-900/10 px-2 py-1 rounded border border-green-900/30">
-            ID: USER-8392-DEMO
+            ID: {user.id.slice(0, 8).toUpperCase()}
           </div>
         </div>
 

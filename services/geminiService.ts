@@ -1,14 +1,13 @@
 
 import { GoogleGenAI } from "@google/genai";
+import { supabase, isSupabaseConfigured } from './supabase';
 import type { GeneratedNews } from '../types';
 
-// Função auxiliar para obter a API Key de forma segura em diferentes ambientes (Vite, Next, CRA, etc)
+// Função auxiliar para obter a API Key
 const getApiKey = () => {
-  // Tenta processo padrão (Node/CRA)
   if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
     return process.env.API_KEY;
   }
-  // Tenta Vite (import.meta.env)
   if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
     return (import.meta as any).env.VITE_API_KEY || (import.meta as any).env.API_KEY;
   }
@@ -16,37 +15,38 @@ const getApiKey = () => {
 };
 
 const apiKey = getApiKey();
-
-// Inicializa com a chave obtida de forma segura.
-// Removemos o fallback direto para process.env.API_KEY no construtor para evitar ReferenceError na Vercel.
 const ai = new GoogleGenAI({ apiKey: apiKey || '' });
 
-// --- Analytics Helper ---
-const logAnalytics = (data: { 
-  theme: string; 
-  tone: string; 
-  success: boolean; 
-  latencyMs: number; 
-  tokens?: number 
-}) => {
-  try {
-    const existing = localStorage.getItem('news_app_analytics');
-    const logs = existing ? JSON.parse(existing) : [];
-    logs.push({
-      ...data,
-      timestamp: Date.now(),
-    });
-    // Keep only last 100 logs to prevent storage overflow in demo
-    if (logs.length > 100) logs.shift();
-    localStorage.setItem('news_app_analytics', JSON.stringify(logs));
-  } catch (e) {
-    console.warn("Analytics storage failed", e);
-  }
-};
-
 export const generateNewsArticle = async (theme: string, topic: string, tone: string): Promise<GeneratedNews> => {
-  const startTime = performance.now();
   
+  // 1. Verificação de Segurança e Créditos
+  if (!isSupabaseConfigured()) {
+      throw new Error("Erro de Configuração: Supabase URL ausente. O sistema de créditos e login não está ativo.");
+  }
+
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+      throw new Error("Usuário não autenticado. Faça login para continuar.");
+  }
+
+  // Verificar saldo no banco de dados
+  const { data: userProfile, error: profileError } = await supabase
+      .from('usuarios')
+      .select('creditos_saldo')
+      .eq('id', user.id)
+      .single();
+
+  if (profileError || !userProfile) {
+      throw new Error("Erro ao verificar saldo da conta.");
+  }
+
+  if (userProfile.creditos_saldo <= 0) {
+      // Simula erro HTTP 402 Payment Required
+      throw new Error("Saldo insuficiente. Por favor, recarregue seus créditos.");
+  }
+
+  const startTime = performance.now();
   const today = new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   const prompt = `
@@ -108,6 +108,7 @@ export const generateNewsArticle = async (theme: string, topic: string, tone: st
   `;
 
   try {
+    // 2. Chamada Gemini AI
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,
@@ -120,36 +121,23 @@ export const generateNewsArticle = async (theme: string, topic: string, tone: st
     let parsedContent: GeneratedNews;
     
     try {
-        // First attempt: direct parse
-        parsedContent = JSON.parse(responseText);
-    } catch (e) {
-        // Second attempt: clean markdown code blocks
         let cleanText = responseText
             .replace(/^```json\s*/, "")
             .replace(/^```\s*/, "")
             .replace(/\s*```$/, "")
             .trim();
-
-        try {
-            parsedContent = JSON.parse(cleanText);
-        } catch (e2) {
-             // Third attempt: Extract JSON object from mixed text
-             const firstBrace = cleanText.indexOf('{');
-             const lastBrace = cleanText.lastIndexOf('}');
-             
-             if (firstBrace !== -1 && lastBrace !== -1) {
-                try {
-                    const extractedJson = cleanText.substring(firstBrace, lastBrace + 1);
-                    parsedContent = JSON.parse(extractedJson);
-                } catch (finalErr) {
-                    console.error("Failed extracting JSON:", responseText);
-                    throw new Error("A resposta da IA não retornou um JSON válido. Tente novamente.");
-                }
-             } else {
-                 console.error("Raw response:", responseText);
-                 throw new Error("A resposta da IA não retornou um JSON válido. Tente novamente.");
-             }
+        
+        // Tenta encontrar JSON dentro do texto se houver lixo ao redor
+        const firstBrace = cleanText.indexOf('{');
+        const lastBrace = cleanText.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1) {
+            cleanText = cleanText.substring(firstBrace, lastBrace + 1);
         }
+
+        parsedContent = JSON.parse(cleanText);
+    } catch (e) {
+        console.error("Falha no parse JSON:", responseText);
+        throw new Error("Erro ao processar resposta da IA. Tente novamente.");
     }
 
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [];
@@ -164,32 +152,40 @@ export const generateNewsArticle = async (theme: string, topic: string, tone: st
           index === self.findIndex((s) => s.uri === source.uri)
       );
 
-    // Log Success
-    logAnalytics({
-        theme,
-        tone,
-        success: true,
-        latencyMs: performance.now() - startTime
-    });
-
-    return {
+    const finalNews = {
       ...parsedContent,
       sources,
     };
+
+    // 3. Transação de Débito e Histórico (Atomic Operation)
+    // Reduz saldo
+    const newBalance = userProfile.creditos_saldo - 1;
+    const { error: updateError } = await supabase
+        .from('usuarios')
+        .update({ creditos_saldo: newBalance })
+        .eq('id', user.id);
+
+    if (updateError) console.error("Erro ao debitar crédito", updateError);
+
+    // Salva histórico no Supabase
+    const { error: historyError } = await supabase
+        .from('historico_prompts')
+        .insert([{
+            user_id: user.id,
+            prompt_text: `${theme} - ${topic} (${tone})`,
+            response_json: finalNews,
+            timestamp: new Date().toISOString()
+        }]);
+
+    if (historyError) console.error("Erro ao salvar histórico", historyError);
+
+    return finalNews;
     
   } catch (error) {
-    // Log Error
-    logAnalytics({
-        theme,
-        tone,
-        success: false,
-        latencyMs: performance.now() - startTime
-    });
-
-    console.error("Error calling Gemini API:", error);
+    console.error("Erro no processo de geração:", error);
     if (error instanceof Error) {
-        throw new Error(`Falha ao gerar notícia: ${error.message}`);
+        throw error;
     }
-    throw new Error("Falha ao gerar notícia: um erro desconhecido ocorreu.");
+    throw new Error("Falha desconhecida ao gerar notícia.");
   }
 };

@@ -1,84 +1,105 @@
 
+import { supabase, isSupabaseConfigured } from './supabase';
 import type { User } from '../types';
 
-// Simulação de banco de dados local
-const MOCK_USERS: User[] = [
-  {
-    id: 'admin-01',
-    name: 'Super Admin',
-    email: 'admin@newsai.com',
-    role: 'admin',
-    plan: 'Enterprise',
-    credits: 9999
-  },
-  {
-    id: 'user-01',
-    name: 'Usuário Demo',
-    email: 'demo@user.com',
-    role: 'user',
-    plan: 'Gratuito',
-    credits: 0 // Simulando sem créditos para teste
-  }
-];
-
 export const authService = {
-  login: async (email: string, password: string, type: 'user' | 'admin'): Promise<User> => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        // Simulação simples: qualquer senha > 3 chars funciona para fins de demo
-        // Em produção, validar hash de senha real via Supabase
-        if (password.length < 3) {
-            reject(new Error('Senha inválida'));
-            return;
-        }
+  async login(email: string, password: string): Promise<User> {
+    if (!isSupabaseConfigured()) throw new Error("Supabase não configurado. Verifique as variáveis de ambiente (VITE_SUPABASE_URL).");
 
-        const foundUser = MOCK_USERS.find(u => u.email === email);
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    
+    if (error) throw error;
+    if (!data.user) throw new Error("Usuário não encontrado.");
+
+    // Fetch profile
+    const { data: profile, error: profileError } = await supabase
+        .from('usuarios')
+        .select('*')
+        .eq('id', data.user.id)
+        .single();
+
+    if (profileError) {
+       console.warn("Perfil não encontrado na tabela publica, usando metadados de auth");
+    }
+
+    // Verifica role na tabela publica OU nos metadados do usuário
+    const isAdmin = 
+        profile?.role === 'super_admin' || 
+        profile?.role === 'admin' || 
+        data.user.user_metadata?.role === 'admin' ||
+        data.user.user_metadata?.role === 'super_admin';
+
+    return {
+        id: data.user.id,
+        name: profile?.name || data.user.user_metadata?.name || 'Usuário',
+        email: data.user.email || '',
+        role: isAdmin ? 'admin' : 'user',
+        plan: profile?.plan || 'Gratuito',
+        credits: profile?.creditos_saldo ?? 0,
+        status: profile?.status || 'active',
+        created_at: data.user.created_at
+    };
+  },
+
+  async register(name: string, email: string, password: string): Promise<User> {
+    if (!isSupabaseConfigured()) throw new Error("Supabase não configurado. Impossível registrar usuários.");
+
+    const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { name, role: 'user' } } // Default role in metadata
+    });
+
+    if (error) throw error;
+    if (!data.user) throw new Error("Erro ao criar conta.");
+
+    return {
+        id: data.user.id,
+        name: name,
+        email: email,
+        role: 'user',
+        plan: 'Gratuito',
+        credits: 3,
+        status: 'active'
+    };
+  },
+
+  async logout(): Promise<void> {
+    if (!isSupabaseConfigured()) return;
+    await supabase.auth.signOut();
+  },
+
+  async getCurrentSession(): Promise<User | null> {
+    if (!isSupabaseConfigured()) return null;
+    
+    try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error || !session?.user) return null;
+
+        const { data: profile } = await supabase
+          .from('usuarios')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
         
-        if (foundUser) {
-            // Verifica se o usuário tentou logar na área certa
-            if (type === 'admin' && foundUser.role !== 'admin') {
-                reject(new Error('Acesso negado: Este usuário não é administrador.'));
-                return;
-            }
-            resolve(foundUser);
-        } else {
-            // Se não achou mock, cria um usuário fake na hora para permitir teste
-            if (type === 'admin') {
-                 reject(new Error('Admin não encontrado. Use admin@newsai.com'));
-                 return;
-            }
-            // Login "fake" para novos emails
-            const newUser: User = {
-                id: `user-${Date.now()}`,
-                name: email.split('@')[0],
-                email,
-                role: 'user',
-                plan: 'Gratuito',
-                credits: 3 // Novos usuários ganham 3 créditos
-            };
-            resolve(newUser);
-        }
-      }, 1000);
-    });
-  },
-
-  register: async (name: string, email: string, password: string): Promise<User> => {
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            const newUser: User = {
-                id: `user-${Date.now()}`,
-                name,
-                email,
-                role: 'user',
-                plan: 'Gratuito',
-                credits: 3
-            };
-            resolve(newUser);
-        }, 1500);
-    });
-  },
-
-  logout: async (): Promise<void> => {
-      return new Promise(resolve => setTimeout(resolve, 500));
+        const isAdmin = 
+            profile?.role === 'super_admin' || 
+            profile?.role === 'admin' || 
+            session.user.user_metadata?.role === 'admin' ||
+            session.user.user_metadata?.role === 'super_admin';
+      
+         return {
+          id: session.user.id,
+          name: profile?.name || session.user.user_metadata?.name || 'Usuário',
+          email: session.user.email || '',
+          role: isAdmin ? 'admin' : 'user',
+          plan: profile?.plan || 'Gratuito',
+          credits: profile?.creditos_saldo ?? 0,
+          status: profile?.status || 'active',
+          created_at: session.user.created_at
+      };
+    } catch (error) {
+        return null;
+    }
   }
 };
