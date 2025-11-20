@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "vercel-build": "npm run build"
+    "vercel-build": "tsc && vite build"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
@@ -25,11 +25,4 @@
     "typescript": "^5.8.2",
     "vite": "^6.2.0"
   }
-}
-	{
-	  "scripts": {
-		"vercel-build": "tsc && vite build",
-		"build": "tsc && vite build",
-		"dev": "vite"
-	  }
 }
