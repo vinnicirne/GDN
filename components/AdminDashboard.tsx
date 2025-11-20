@@ -26,7 +26,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'plans' | 'analytics' | 'settings'>('dashboard');
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false); // ← ADICIONE ESTA LINHA
+  const [isSaving, setIsSaving] = useState(false);
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
@@ -166,76 +166,70 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  // Salvar configurações do sistema - VERSÃO CORRIGIDA
-const saveSystemConfig = async () => {
-  console.log('🔄 Iniciando salvamento das configurações...');
-  setIsSaving(true);
-  
-  try {
-    // Verificar conexão com Supabase
-    console.log('📡 Verificando conexão com Supabase...');
-    const { data: testData, error: testError } = await supabase
-      .from('configuracoes')
-      .select('chave')
-      .limit(1);
+  // FUNÇÃO DE TESTE SIMPLES
+  const testSaveSimple = async () => {
+    console.log('🎯 TESTE SIMPLES INICIADO');
+    
+    try {
+      console.log('1. Testando conexão com Supabase...');
+      const { data, error } = await supabase
+        .from('configuracoes')
+        .select('count')
+        .limit(1);
 
-    if (testError) {
-      throw new Error(`Erro de conexão com Supabase: ${testError.message}`);
-    }
-    console.log('✅ Conexão com Supabase OK');
-
-    // Preparar configurações para salvar - CORREÇÃO AQUI
-    const configsToSave = [
-      { 
-        chave: 'gemini', 
-        valor: {
-          apiKey: systemConfig.gemini.apiKey || '',
-          model: systemConfig.gemini.model || 'gemini-2.0-flash',
-          maxTokens: Number(systemConfig.gemini.maxTokens) || 1000,
-          temperature: Number(systemConfig.gemini.temperature) || 0.7,
-          enabled: Boolean(systemConfig.gemini.enabled)
-        }, 
-        descricao: 'Configurações da API Gemini', 
-        categoria: 'api' 
-      },
-      { 
-        chave: 'mercadopago', 
-        valor: {
-          accessToken: systemConfig.mercadoPago.accessToken || '',
-          publicKey: systemConfig.mercadoPago.publicKey || '',
-          webhookUrl: systemConfig.mercadoPago.webhookUrl || generateWebhookUrl(),
-          enabled: Boolean(systemConfig.mercadoPago.enabled)
-        }, 
-        descricao: 'Configurações do MercadoPago', 
-        categoria: 'pagamento' 
-      },
-      { 
-        chave: 'app', 
-        valor: {
-          appName: systemConfig.app.appName || 'Gerador de Notícias AI',
-          supportEmail: systemConfig.app.supportEmail || '',
-          whatsappNumber: systemConfig.app.whatsappNumber || '',
-          contactMessage: systemConfig.app.contactMessage || '',
-          logoUrl: systemConfig.app.logoUrl || ''
-        }, 
-        descricao: 'Configurações da Aplicação', 
-        categoria: 'app' 
+      if (error) {
+        console.error('❌ Erro na conexão:', error);
+        alert(`Erro de conexão: ${error.message}`);
+        return;
       }
-    ];
+      console.log('✅ Conexão OK');
 
-    console.log('💾 Todas as configurações a salvar:', configsToSave);
+      console.log('2. Tentando salvar configuração teste...');
+      const { data: saveData, error: saveError } = await supabase
+        .from('configuracoes')
+        .upsert({
+          chave: 'teste_debug',
+          valor: { test: true, timestamp: new Date().toISOString() },
+          descricao: 'Configuração de teste',
+          categoria: 'debug',
+          updated_at: new Date().toISOString()
+        })
+        .select();
 
-    // Salvar cada configuração individualmente
-    const savePromises = configsToSave.map(async (config) => {
-      console.log(`📝 Salvando configuração: ${config.chave}`, config.valor);
-      
+      if (saveError) {
+        console.error('❌ Erro ao salvar:', saveError);
+        alert(`Erro ao salvar: ${saveError.message}`);
+        return;
+      }
+
+      console.log('✅ Salvamento teste OK:', saveData);
+      alert('✅ TESTE: Configuração salva com sucesso! Verifique o console.');
+
+    } catch (error: any) {
+      console.error('❌ Erro geral:', error);
+      alert(`Erro: ${error.message}`);
+    }
+  };
+
+  // Função de emergência - salva apenas MercadoPago
+  const saveOnlyMercadoPago = async () => {
+    try {
+      const mercadopagoData = {
+        accessToken: systemConfig.mercadoPago.accessToken,
+        publicKey: systemConfig.mercadoPago.publicKey,
+        webhookUrl: systemConfig.mercadoPago.webhookUrl || generateWebhookUrl(),
+        enabled: Boolean(systemConfig.mercadoPago.enabled)
+      };
+
+      console.log('🚨 SALVANDO APENAS MERCADOPAGO:', mercadopagoData);
+
       const { data, error } = await supabase
         .from('configuracoes')
         .upsert({
-          chave: config.chave,
-          valor: config.valor,
-          descricao: config.descricao,
-          categoria: config.categoria,
+          chave: 'mercadopago',
+          valor: mercadopagoData,
+          descricao: 'Configurações do MercadoPago',
+          categoria: 'pagamento',
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'chave'
@@ -243,75 +237,189 @@ const saveSystemConfig = async () => {
         .select();
 
       if (error) {
-        console.error(`❌ Erro ao salvar ${config.chave}:`, error);
-        throw new Error(`Erro ao salvar ${config.chave}: ${error.message}`);
+        console.error('❌ Erro MercadoPago:', error);
+        alert(`Erro: ${error.message}`);
+        return;
       }
-      
-      console.log(`✅ ${config.chave} salvo com sucesso:`, data);
-      return { chave: config.chave, success: true, data };
-    });
 
-    // Esperar todas as promises serem resolvidas
-    const results = await Promise.all(savePromises);
-    console.log('📋 Resultados do salvamento:', results);
-
-    // Verificar se todas as configurações foram salvas
-    if (results.length === configsToSave.length) {
-      // Atualizar o appConfig no componente pai
-      onUpdateAppConfig(systemConfig.app);
+      console.log('✅ MercadoPago salvo:', data);
+      alert('✅ MercadoPago salvo com sucesso!');
       
-      console.log('✅ Todas as configurações salvas com sucesso!');
-      alert('✅ Configurações salvas com sucesso!');
-      
-      // Forçar recarregamento dos dados
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
-    } else {
-      throw new Error(`Apenas ${results.length} de ${configsToSave.length} configurações foram salvas`);
+    } catch (error: any) {
+      console.error('❌ Erro geral:', error);
+      alert(`Erro: ${error.message}`);
     }
+  };
 
-  } catch (error: any) {
-    console.error('❌ Erro completo ao salvar configurações:', error);
-    alert(`❌ Erro ao salvar configurações: ${error.message}`);
-  } finally {
-    setIsSaving(false);
-  }
-};
+  // Função para debug - ver configurações atuais no banco
+  const debugCurrentConfigs = async () => {
+    console.log('🐛 DEBUG: Buscando configurações atuais do banco...');
+    
+    try {
+      const { data, error } = await supabase
+        .from('configuracoes')
+        .select('*')
+        .order('chave');
+
+      if (error) {
+        console.error('❌ Erro ao buscar configurações:', error);
+        return;
+      }
+
+      console.log('📊 Configurações atuais no banco:', data);
+      alert(`Configurações no banco: ${data?.length || 0} registros. Verifique o console.`);
+      
+    } catch (error) {
+      console.error('❌ Erro no debug:', error);
+    }
+  };
+
+  // Salvar configurações do sistema - VERSÃO CORRIGIDA
+  const saveSystemConfig = async () => {
+    console.log('🔄 Iniciando salvamento das configurações...');
+    setIsSaving(true);
+    
+    try {
+      // Verificar conexão com Supabase
+      console.log('📡 Verificando conexão com Supabase...');
+      const { data: testData, error: testError } = await supabase
+        .from('configuracoes')
+        .select('chave')
+        .limit(1);
+
+      if (testError) {
+        throw new Error(`Erro de conexão com Supabase: ${testError.message}`);
+      }
+      console.log('✅ Conexão com Supabase OK');
+
+      // Preparar configurações para salvar
+      const configsToSave = [
+        { 
+          chave: 'gemini', 
+          valor: {
+            apiKey: systemConfig.gemini.apiKey || '',
+            model: systemConfig.gemini.model || 'gemini-2.0-flash',
+            maxTokens: Number(systemConfig.gemini.maxTokens) || 1000,
+            temperature: Number(systemConfig.gemini.temperature) || 0.7,
+            enabled: Boolean(systemConfig.gemini.enabled)
+          }, 
+          descricao: 'Configurações da API Gemini', 
+          categoria: 'api' 
+        },
+        { 
+          chave: 'mercadopago', 
+          valor: {
+            accessToken: systemConfig.mercadoPago.accessToken || '',
+            publicKey: systemConfig.mercadoPago.publicKey || '',
+            webhookUrl: systemConfig.mercadoPago.webhookUrl || generateWebhookUrl(),
+            enabled: Boolean(systemConfig.mercadoPago.enabled)
+          }, 
+          descricao: 'Configurações do MercadoPago', 
+          categoria: 'pagamento' 
+        },
+        { 
+          chave: 'app', 
+          valor: {
+            appName: systemConfig.app.appName || 'Gerador de Notícias AI',
+            supportEmail: systemConfig.app.supportEmail || '',
+            whatsappNumber: systemConfig.app.whatsappNumber || '',
+            contactMessage: systemConfig.app.contactMessage || '',
+            logoUrl: systemConfig.app.logoUrl || ''
+          }, 
+          descricao: 'Configurações da Aplicação', 
+          categoria: 'app' 
+        }
+      ];
+
+      console.log('💾 Todas as configurações a salvar:', configsToSave);
+
+      // Salvar cada configuração individualmente
+      const savePromises = configsToSave.map(async (config) => {
+        console.log(`📝 Salvando configuração: ${config.chave}`, config.valor);
+        
+        const { data, error } = await supabase
+          .from('configuracoes')
+          .upsert({
+            chave: config.chave,
+            valor: config.valor,
+            descricao: config.descricao,
+            categoria: config.categoria,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'chave'
+          })
+          .select();
+
+        if (error) {
+          console.error(`❌ Erro ao salvar ${config.chave}:`, error);
+          throw new Error(`Erro ao salvar ${config.chave}: ${error.message}`);
+        }
+        
+        console.log(`✅ ${config.chave} salvo com sucesso:`, data);
+        return { chave: config.chave, success: true, data };
+      });
+
+      // Esperar todas as promises serem resolvidas
+      const results = await Promise.all(savePromises);
+      console.log('📋 Resultados do salvamento:', results);
+
+      // Verificar se todas as configurações foram salvas
+      if (results.length === configsToSave.length) {
+        // Atualizar o appConfig no componente pai
+        onUpdateAppConfig(systemConfig.app);
+        
+        console.log('✅ Todas as configurações salvas com sucesso!');
+        alert('✅ Configurações salvas com sucesso!');
+        
+        // Forçar recarregamento dos dados
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } else {
+        throw new Error(`Apenas ${results.length} de ${configsToSave.length} configurações foram salvas`);
+      }
+
+    } catch (error: any) {
+      console.error('❌ Erro completo ao salvar configurações:', error);
+      alert(`❌ Erro ao salvar configurações: ${error.message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Testar configuração do MercadoPago - VERSÃO ATUALIZADA
-const testMercadoPagoConfig = async () => {
-  if (!systemConfig.mercadoPago.accessToken) {
-    alert('Por favor, configure o Access Token do MercadoPago primeiro');
-    return;
-  }
-
-  try {
-    setIsLoading(true);
-    
-    // Testar autenticação com a API do MercadoPago
-    const response = await fetch('https://api.mercadopago.com/v1/payment_methods', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${systemConfig.mercadoPago.accessToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (response.ok) {
-      alert('✅ Credenciais do MercadoPago válidas! Conexão estabelecida com sucesso.');
-    } else if (response.status === 401) {
-      alert('❌ Access Token inválido ou expirado. Verifique suas credenciais.');
-    } else {
-      alert(`⚠️ Credenciais válidas, mas houve um erro na API: ${response.status}`);
+  const testMercadoPagoConfig = async () => {
+    if (!systemConfig.mercadoPago.accessToken) {
+      alert('Por favor, configure o Access Token do MercadoPago primeiro');
+      return;
     }
-  } catch (error) {
-    console.error('Erro ao testar MercadoPago:', error);
-    alert('❌ Erro ao conectar com MercadoPago. Verifique sua conexão.');
-  } finally {
-    setIsLoading(false);
-  }
-};
+
+    try {
+      setIsLoading(true);
+      
+      // Testar autenticação com a API do MercadoPago
+      const response = await fetch('https://api.mercadopago.com/v1/payment_methods', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${systemConfig.mercadoPago.accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        alert('✅ Credenciais do MercadoPago válidas! Conexão estabelecida com sucesso.');
+      } else if (response.status === 401) {
+        alert('❌ Access Token inválido ou expirado. Verifique suas credenciais.');
+      } else {
+        alert(`⚠️ Credenciais válidas, mas houve um erro na API: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Erro ao testar MercadoPago:', error);
+      alert('❌ Erro ao conectar com MercadoPago. Verifique sua conexão.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Testar configuração do Gemini
   const testGeminiConfig = async () => {
@@ -341,79 +449,42 @@ const testMercadoPagoConfig = async () => {
   };
 
   // Testar webhook - VERSÃO MELHORADA
-const testWebhook = async () => {
-  const webhookUrl = systemConfig.mercadoPago.webhookUrl || generateWebhookUrl();
-  
-  if (!webhookUrl) {
-    alert('URL do webhook não configurada');
-    return;
-  }
-
-  try {
-    setIsLoading(true);
+  const testWebhook = async () => {
+    const webhookUrl = systemConfig.mercadoPago.webhookUrl || generateWebhookUrl();
     
-    const response = await fetch(webhookUrl, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-
-    const result = await response.json();
-
-    if (response.ok) {
-      alert('✅ Webhook está respondendo corretamente! Serviço online.');
-    } else {
-      alert(`❌ Webhook retornou erro: ${response.status} - ${JSON.stringify(result)}`);
+    if (!webhookUrl) {
+      alert('URL do webhook não configurada');
+      return;
     }
-  } catch (error) {
-    console.error('Erro ao testar webhook:', error);
-    alert('❌ Erro ao testar webhook: Verifique se a URL está correta e acessível.');
-  } finally {
-    setIsLoading(false);
-  }
-};
-	// Função para debug - ver configurações atuais no banco
-	const debugCurrentConfigs = async () => {
-	  console.log('🐛 DEBUG: Buscando configurações atuais do banco...');
-	  
-	  try {
-		const { data, error } = await supabase
-		  .from('configuracoes')
-		  .select('*')
-		  .order('chave');
 
-		if (error) {
-		  console.error('❌ Erro ao buscar configurações:', error);
-		  return;
-		}
+    try {
+      setIsLoading(true);
+      
+      const response = await fetch(webhookUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
 
-		console.log('📊 Configurações atuais no banco:', data);
-		alert(`Configurações no banco: ${data?.length || 0} registros. Verifique o console.`);
-		
-	  } catch (error) {
-		console.error('❌ Erro no debug:', error);
-	  }
-	};
+      const result = await response.json();
+
+      if (response.ok) {
+        alert('✅ Webhook está respondendo corretamente! Serviço online.');
+      } else {
+        alert(`❌ Webhook retornou erro: ${response.status} - ${JSON.stringify(result)}`);
+      }
+    } catch (error) {
+      console.error('Erro ao testar webhook:', error);
+      alert('❌ Erro ao testar webhook: Verifique se a URL está correta e acessível.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Renderizar Dashboard
   const renderDashboard = () => (
-    
-			{/* Botões de Debug - REMOVA DEPOIS */}
-	<div className="flex justify-end gap-4 mb-4 border-t border-gray-700 pt-4">
-	  <button 
-		onClick={debugCurrentConfigs}
-		className="bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded-lg transition text-sm"
-	  >
-		🐛 Ver Configs Atuais
-	  </button>
-	  <button 
-		onClick={testSaveSimple}
-		className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg transition text-sm"
-	  >
-		🧪 Teste Simples
-	  </button>
-	</div>
-	<div className="space-y-6">
+    <div className="space-y-6">
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-black border border-green-900/30 rounded-xl p-6">
@@ -875,26 +946,109 @@ const testWebhook = async () => {
         </div>
       </div>
 
+      {/* Botões de Debug */}
+      <div className="flex justify-end gap-4 mb-4 border-t border-gray-700 pt-4">
+        <button 
+          onClick={debugCurrentConfigs}
+          className="bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded-lg transition text-sm"
+        >
+          🐛 Ver Configs Atuais
+        </button>
+        <button 
+          onClick={testSaveSimple}
+          className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg transition text-sm"
+        >
+          🧪 Teste Simples
+        </button>
+        <button 
+          onClick={saveOnlyMercadoPago}
+          className="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded-lg transition text-sm"
+        >
+          🚨 Salvar Só MP
+        </button>
+      </div>
+
       {/* Botão Salvar */}
-<div className="flex justify-end">
-  <button 
-    onClick={saveSystemConfig}
-    disabled={isSaving}
-    className="bg-green-600 hover:bg-green-500 disabled:bg-gray-600 text-white font-bold py-3 px-8 rounded-lg transition flex items-center gap-2 disabled:opacity-50"
-  >
-    {isSaving ? (
-      <>
-        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-        Salvando...
-      </>
-    ) : (
-      <>
-        <span>💾</span>
-        Salvar Todas as Configurações
-      </>
-    )}
-  </button>
-</div>
+      <div className="flex justify-end">
+        <button 
+          onClick={saveSystemConfig}
+          disabled={isSaving}
+          className="bg-green-600 hover:bg-green-500 disabled:bg-gray-600 text-white font-bold py-3 px-8 rounded-lg transition flex items-center gap-2 disabled:opacity-50"
+        >
+          {isSaving ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              Salvando...
+            </>
+          ) : (
+            <>
+              <span>💾</span>
+              Salvar Todas as Configurações
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-black p-4 md:p-8 text-gray-200 animate-fade-in">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={onBack} 
+              className="p-2 hover:bg-green-900/20 rounded-full transition text-gray-400 hover:text-green-400"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+              </svg>
+            </button>
+            <h1 className="text-2xl font-bold text-white">Painel Administrativo</h1>
+          </div>
+          <div className="text-xs font-mono text-green-500 border border-green-900 px-2 py-1 rounded">
+            CONNECTED: PROD
+          </div>
+        </div>
+
+        {/* Navigation Tabs */}
+        <div className="flex space-x-1 bg-gray-900/50 p-1 rounded-lg mb-8">
+          {[
+            { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+            { id: 'users', label: 'Usuários', icon: '👥' },
+            { id: 'settings', label: 'Configurações', icon: '⚙️' }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md transition ${
+                activeTab === tab.id 
+                  ? 'bg-green-900/30 text-green-400' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <span>{tab.icon}</span>
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        {isLoading ? (
+          <div className="text-center text-gray-500 py-20">
+            <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            Carregando dados do banco...
+          </div>
+        ) : (
+          <div className="animate-fade-in">
+            {activeTab === 'dashboard' && renderDashboard()}
+            {activeTab === 'users' && renderUsersManagement()}
+            {activeTab === 'settings' && renderSettings()}
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 
