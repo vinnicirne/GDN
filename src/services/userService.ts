@@ -1,36 +1,75 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase, isSupabaseConfigured } from './supabase';
+import type { GeneratedNews } from '../types';
 
-// Função para obter variáveis de ambiente de forma segura
-const getEnvVar = (key: string): string => {
-  // Verifica se estamos no ambiente Vite (import.meta.env)
-  if (typeof import.meta !== 'undefined' && import.meta.env) {
-    return import.meta.env[key] || '';
+export const userService = {
+  // Debita créditos do usuário
+  async debitCredits(userId: string, currentCredits: number): Promise<number> {
+    if (!isSupabaseConfigured()) throw new Error("Supabase não configurado.");
+    
+    const newCredits = currentCredits - 1;
+    
+    const { error } = await supabase
+      .from('usuarios')
+      .update({ creditos_saldo: newCredits })
+      .eq('id', userId);
+      
+    if (error) throw error;
+    return newCredits;
+  },
+
+  // Salva no histórico de gerações
+  async saveHistory(userId: string, title: string, newsContent: GeneratedNews): Promise<void> {
+    if (!isSupabaseConfigured()) throw new Error("Supabase não configurado.");
+    
+    const { error } = await supabase
+      .from('historico_geracoes')
+      .insert([{
+        user_id: userId,
+        titulo: title,
+        conteudo: newsContent,
+        data_geracao: new Date().toISOString()
+      }]);
+      
+    if (error) throw error;
+  },
+
+  // Busca perfil do usuário
+  async getUserProfile(userId: string) {
+    if (!isSupabaseConfigured()) throw new Error("Supabase não configurado.");
+    
+    const { data, error } = await supabase
+      .from('usuarios')
+      .select('*')
+      .eq('id', userId)
+      .single();
+      
+    if (error) throw error;
+    return data;
+  },
+
+  // Atualiza créditos do usuário
+  async updateUserCredits(userId: string, newCredits: number) {
+    if (!isSupabaseConfigured()) throw new Error("Supabase não configurado.");
+    
+    const { error } = await supabase
+      .from('usuarios')
+      .update({ creditos_saldo: newCredits })
+      .eq('id', userId);
+      
+    if (error) throw error;
+  },
+
+  // Busca créditos do usuário
+  async getUserCredits(userId: string): Promise<number> {
+    if (!isSupabaseConfigured()) throw new Error("Supabase não configurado.");
+    
+    const { data, error } = await supabase
+      .from('usuarios')
+      .select('creditos_saldo')
+      .eq('id', userId)
+      .single();
+      
+    if (error) throw error;
+    return data?.creditos_saldo ?? 0;
   }
-  // Fallback para process.env (caso necessário)
-  if (typeof process !== 'undefined' && process.env) {
-    return process.env[key] || '';
-  }
-  return '';
 };
-
-const supabaseUrl = getEnvVar('VITE_SUPABASE_URL');
-const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY');
-
-export const isSupabaseConfigured = (): boolean => {
-  return !!supabaseUrl && !!supabaseAnonKey;
-};
-
-// Cria a instância do cliente Supabase
-// Se as chaves não existirem, usa valores placeholder para não quebrar a compilação,
-// mas a função isSupabaseConfigured impedirá o uso real.
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder-url.supabase.co',
-  supabaseAnonKey || 'placeholder-key',
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true
-    }
-  }
-);
