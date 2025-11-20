@@ -1,242 +1,79 @@
 import React, { useState, useEffect } from 'react';
+import Header from './components/Header';
+import NewsGeneratorForm from './components/NewsGeneratorForm';
+import UpgradeModal from './components/UpgradeModal';
+import CheckoutModal from './components/CheckoutModal';
+import Documentation from './components/Documentation';
+import UserDashboard from './components/UserDashboard';
+import AdminDashboard from './components/AdminDashboard';
+import Login from './components/Login';
+import Register from './components/Register';
+import { generateNewsArticle } from './services/geminiService';
+import { authService } from './services/authService';
+import { supabase, isSupabaseConfigured } from './services/supabase';
+import type { GeneratedNews, PlanConfig, AppConfig, User } from './types';
+import { NEWS_THEMES, NEWS_TONES } from './constants';
 
-// Interfaces básicas para funcionar sem imports externos
-interface User {
-  id: string;
-  email: string;
-  role: string;
-  credits: number;
-}
+// --- CONSTANTS ---
 
-interface PlanConfig {
-  id: string;
-  name: string;
-  price: number;
-  credits: number;
-  recurrence: string;
-  features: string[];
-  active: boolean;
-  recommended?: boolean;
-}
+// No início do App.tsx, depois dos imports
+console.log('=== SUPABASE DEBUG ===');
+console.log('Supabase object:', supabase);
+console.log('Supabase URL:', supabase?.supabaseUrl);
+console.log('isConfigured:', isSupabaseConfigured());
 
-interface AppConfig {
-  appName: string;
-  logoUrl: string;
-  supportEmail: string;
-  whatsappNumber: string;
-  contactMessage: string;
-}
-
-interface GeneratedNews {
-  id?: string;
-  title: string;
-  body: string;
-  imagePrompt: string;
-  sources: Array<{
-    uri: string;
-    title: string;
-  }>;
-  seo: {
-    focusKeyword: string;
-    seoTitle: string;
-    slug: string;
-    metaDescription: string;
-    tags: string[];
-  };
-  created_at?: string;
-}
-
-// Constantes básicas
-const NEWS_THEMES = ['Tecnologia', 'Política', 'Esportes', 'Entretenimento', 'Ciência', 'Economia'];
-const NEWS_TONES = ['Neutro', 'Formal', 'Informal', 'Urgente'];
-
-// Serviços mock para funcionar sem imports quebrados
-const authService = {
-  getCurrentSession: async (): Promise<User | null> => {
-    return null; // Sem usuário por padrão
+const INITIAL_PLANS: PlanConfig[] = [
+  { 
+    id: 'p_free', 
+    name: 'Gratuito', 
+    price: 0, 
+    credits: 3, 
+    recurrence: 'Mensal', 
+    features: ['Grounding: Incluso', 'Tons: Padrão (4)', 'Suporte: FAQ'], 
+    active: true,
+    recommended: false
   },
-  logout: async (): Promise<void> => {
-    console.log('Logout realizado');
+  { 
+    id: 'p_basic', 
+    name: 'Básico', 
+    price: 99.00, 
+    credits: 50, 
+    recurrence: 'Mensal', 
+    features: ['Grounding: Incluso', 'Tons: Todos', 'Custo/Crédito: R$ 1,98'], 
+    active: true,
+    recommended: false
+  },
+  { 
+    id: 'p_pro', 
+    name: 'Profissional', 
+    price: 349.00, 
+    credits: 200, 
+    recurrence: 'Mensal', 
+    features: ['Prioridade', 'Suporte 24h', 'Custo/Crédito: R$ 1,74'], 
+    active: true,
+    recommended: true
   }
+];
+
+const DEFAULT_CONFIG: AppConfig = {
+  appName: 'Gerador de Notícias',
+  logoUrl: '',
+  supportEmail: 'suporte@newsai.com',
+  whatsappNumber: '5511999999999',
+  contactMessage: 'Olá, preciso de ajuda com a plataforma.'
 };
 
-const generateNewsArticle = async (theme: string, topic: string, tone: string): Promise<GeneratedNews> => {
-  // Mock da geração de notícia
-  return {
-    title: `${topic} - Notícia Gerada sobre ${theme}`,
-    body: `Esta é uma notícia de exemplo sobre ${topic} no tema ${theme} com tom ${tone}. O sistema está funcionando perfeitamente para deploy no Vercel!`,
-    imagePrompt: `Imagem representando ${topic} no contexto de ${theme}`,
-    sources: [
-      {
-        uri: "https://exemplo.com/fonte1",
-        title: "Fonte Exemplo 1"
-      }
-    ],
-    seo: {
-      focusKeyword: `${topic} ${theme}`,
-      seoTitle: `${topic} - Análise Completa | ${theme}`,
-      slug: `noticia-${topic.toLowerCase().replace(/\s+/g, '-')}`,
-      metaDescription: `Notícia completa sobre ${topic} no contexto de ${theme}.`,
-      tags: [theme, topic, 'notícia']
-    }
-  };
-};
-
-// Componentes básicos
+// --- UTILS ---
 const LoadingState: React.FC = () => (
-  <div className="flex flex-col justify-center items-center p-12 animate-fade-in">
-    <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-    <p className="text-green-400 font-mono text-sm animate-pulse">Carregando Sistema...</p>
-  </div>
+    <div className="flex flex-col justify-center items-center p-12 animate-fade-in">
+      <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+      <p className="text-green-400 font-mono text-sm animate-pulse">Carregando Sistema...</p>
+    </div>
 );
 
-const Header: React.FC<{
-  credits: number;
-  onOpenPro: () => void;
-  onOpenDocs: () => void;
-  onOpenProfile: () => void;
-  appConfig: AppConfig;
-}> = ({ credits, onOpenPro, onOpenDocs, onOpenProfile, appConfig }) => (
-  <header className="w-full border-b border-green-900/30 bg-black/80 backdrop-blur-md sticky top-0 z-50">
-    <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-      <div className="flex items-center gap-4">
-        <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-black font-bold">
-          AI
-        </div>
-        <h1 className="text-xl font-bold text-white">{appConfig.appName}</h1>
-      </div>
-      
-      <div className="flex items-center gap-4">
-        <div className="bg-green-900/20 border border-green-900/50 px-3 py-1 rounded-full">
-          <span className="text-green-400 font-mono text-sm">{credits} créditos</span>
-        </div>
-        
-        <button 
-          onClick={onOpenPro}
-          className="bg-green-600 hover:bg-green-500 text-black font-bold py-2 px-4 rounded-lg transition text-sm"
-        >
-          Recarregar
-        </button>
-        
-        <button 
-          onClick={onOpenDocs}
-          className="text-gray-400 hover:text-white transition text-sm"
-        >
-          Docs
-        </button>
-        
-        <button 
-          onClick={onOpenProfile}
-          className="text-gray-400 hover:text-white transition text-sm"
-        >
-          Perfil
-        </button>
-      </div>
-    </div>
-  </header>
-);
-
-const NewsGeneratorForm: React.FC<{
-  theme: string;
-  setTheme: (theme: string) => void;
-  topic: string;
-  setTopic: (topic: string) => void;
-  tone: string;
-  setTone: (tone: string) => void;
-  onSubmit: (e: React.FormEvent) => void;
-  isLoading: boolean;
-  credits: number;
-  onOpenPro: () => void;
-  onLoginRequired: () => void;
-  isLoggedIn: boolean;
-}> = ({ 
-  theme, setTheme, topic, setTopic, tone, setTone, 
-  onSubmit, isLoading, credits, onOpenPro, onLoginRequired, isLoggedIn 
-}) => (
-  <form onSubmit={onSubmit} className="space-y-6">
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {/* Tema */}
-      <div>
-        <label className="block text-gray-400 text-sm font-bold uppercase tracking-wider mb-2">
-          Tema
-        </label>
-        <select
-          value={theme}
-          onChange={(e) => setTheme(e.target.value)}
-          className="w-full bg-black border border-green-900/30 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-green-500"
-        >
-          {NEWS_THEMES.map(t => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Tópico */}
-      <div>
-        <label className="block text-gray-400 text-sm font-bold uppercase tracking-wider mb-2">
-          Tópico
-        </label>
-        <input
-          type="text"
-          value={topic}
-          onChange={(e) => setTopic(e.target.value)}
-          placeholder="Ex: Inteligência Artificial no jornalismo"
-          className="w-full bg-black border border-green-900/30 rounded-lg px-4 py-3 text-white placeholder-gray-700 focus:outline-none focus:border-green-500"
-          required
-        />
-      </div>
-
-      {/* Tom */}
-      <div>
-        <label className="block text-gray-400 text-sm font-bold uppercase tracking-wider mb-2">
-          Tom
-        </label>
-        <select
-          value={tone}
-          onChange={(e) => setTone(e.target.value)}
-          className="w-full bg-black border border-green-900/30 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-green-500"
-        >
-          {NEWS_TONES.map(t => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </select>
-      </div>
-    </div>
-
-    <div className="flex justify-between items-center pt-4">
-      <div className="text-sm text-gray-500">
-        {isLoggedIn ? (
-          <span>Créditos disponíveis: <strong className="text-green-400">{credits}</strong></span>
-        ) : (
-          <span className="text-yellow-500">Faça login para gerar notícias</span>
-        )}
-      </div>
-      
-      <button
-        type="submit"
-        disabled={isLoading || !isLoggedIn || credits <= 0}
-        className="bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-bold py-3 px-8 rounded-lg transition flex items-center gap-2"
-      >
-        {isLoading ? (
-          <>
-            <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
-            Gerando...
-          </>
-        ) : !isLoggedIn ? (
-          'Faça Login'
-        ) : credits <= 0 ? (
-          'Sem Créditos'
-        ) : (
-          '🎯 Gerar Notícia'
-        )}
-      </button>
-    </div>
-  </form>
-);
-
-// Componente principal
+// --- MAIN COMPONENT ---
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<'app' | 'login' | 'register'>('app');
+  const [currentView, setCurrentView] = useState<'app' | 'login' | 'register' | 'user-dashboard' | 'admin-dashboard' | 'docs' | 'admin-docs'>('app');
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
@@ -247,47 +84,91 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
-  const [appConfig] = useState<AppConfig>({
-    appName: 'Gerador de Notícias AI',
-    logoUrl: '',
-    supportEmail: 'suporte@newsai.com',
-    whatsappNumber: '5511999999999',
-    contactMessage: 'Olá, preciso de ajuda com a plataforma.'
-  });
+  const [appConfig, setAppConfig] = useState<AppConfig>(DEFAULT_CONFIG);
+  const [plans, setPlans] = useState<PlanConfig[]>(INITIAL_PLANS);
   
-  const [credits, setCredits] = useState<number>(3); // Créditos iniciais
+  const [credits, setCredits] = useState<number>(0);
   const [history, setHistory] = useState<GeneratedNews[]>([]);
 
-  // Auth initialization
+  const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
+  const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
+  const [checkoutPlan, setCheckoutPlan] = useState<PlanConfig | null>(null);
+
+  // --- AUTH INITIALIZATION ---
   useEffect(() => {
-    const initAuth = async () => {
-      setIsAuthLoading(true);
-      try {
-        const sessionUser = await authService.getCurrentSession();
-        if (sessionUser) {
-          setUser(sessionUser);
-          setCredits(sessionUser.credits);
-        }
-      } catch (error) {
-        console.error("Erro ao restaurar sessão:", error);
-      } finally {
-        setIsAuthLoading(false);
+      const initAuth = async () => {
+          setIsAuthLoading(true);
+          try {
+              const sessionUser = await authService.getCurrentSession();
+              if (sessionUser) {
+                  setUser(sessionUser);
+                  setCredits(sessionUser.credits);
+              }
+          } catch (error) {
+              console.error("Erro ao restaurar sessão:", error);
+          } finally {
+              setIsAuthLoading(false);
+          }
+      };
+      initAuth();
+
+      if (isSupabaseConfigured()) {
+          const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+              if (event === 'SIGNED_OUT') {
+                  setUser(null);
+                  setCredits(0);
+                  setCurrentView('login');
+              } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+                   if (session?.user) {
+                       const refreshedUser = await authService.getCurrentSession();
+                       if (refreshedUser) {
+                           setUser(refreshedUser);
+                           setCredits(refreshedUser.credits);
+                       }
+                   }
+              }
+          });
+          return () => subscription.unsubscribe();
       }
-    };
-    initAuth();
   }, []);
+
+  // Load History when user logs in
+  useEffect(() => {
+      const fetchHistory = async () => {
+          if (!user) {
+              setHistory([]);
+              return;
+          }
+
+          // Produção: Buscar sempre do Supabase
+          const { data, error } = await supabase
+            .from('historico_prompts')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('timestamp', { ascending: false });
+          
+          if (data) {
+             const formatted: GeneratedNews[] = data.map((item: any) => {
+                 const content = item.response_json;
+                 return { ...content, created_at: item.timestamp };
+             });
+             setHistory(formatted);
+          }
+      };
+      fetchHistory();
+  }, [user]);
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!user) {
-      setCurrentView('login');
-      return;
+        setCurrentView('login');
+        return;
     }
 
     if (credits <= 0) {
-      setError('Sem créditos disponíveis. Recarregue para continuar.');
-      return;
+        setShowUpgradeModal(true);
+        return;
     }
 
     setIsLoading(true);
@@ -297,106 +178,112 @@ const App: React.FC = () => {
     try {
       const result = await generateNewsArticle(theme, topic, tone);
       setGeneratedNews(result);
+      
       setCredits(prev => Math.max(0, prev - 1));
       setHistory(prev => [result, ...prev]);
+
     } catch (err) {
-      setError('Falha ao gerar notícia. Tente novamente.');
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Falha desconhecida ao gerar notícia.');
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleLoginSuccess = (u: User) => {
-    setUser(u);
-    setCredits(u.credits);
-    setCurrentView('app');
+      setUser(u);
+      setCredits(u.credits);
+      
+      if (u.role === 'admin') {
+          setCurrentView('admin-dashboard');
+      } else {
+          setCurrentView('app');
+      }
   };
 
   const handleLogout = async () => {
-    await authService.logout();
-    setUser(null);
-    setCredits(0);
-    setCurrentView('login');
+      await authService.logout();
+      setUser(null);
+      setCredits(0);
+      setCurrentView('login');
   };
 
-  // Simulação de login/register
-  const LoginView: React.FC<{ onLoginSuccess: (user: User) => void; onGoToRegister: () => void; }> = 
-    ({ onLoginSuccess, onGoToRegister }) => (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-gray-900/30 border border-green-900/50 rounded-2xl p-8">
-        <h2 className="text-2xl font-bold text-white mb-6 text-center">Login</h2>
-        <button 
-          onClick={() => onLoginSuccess({ 
-            id: '1', 
-            email: 'usuario@exemplo.com', 
-            role: 'user', 
-            credits: 3 
-          })}
-          className="w-full bg-green-600 hover:bg-green-500 text-black font-bold py-3 rounded-lg transition"
-        >
-          Entrar como Usuário Teste
-        </button>
-        <button 
-          onClick={onGoToRegister}
-          className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 rounded-lg transition mt-4"
-        >
-          Criar Conta
-        </button>
-      </div>
-    </div>
-  );
-
-  const RegisterView: React.FC<{ onRegisterSuccess: (user: User) => void; onGoToLogin: () => void; }> = 
-    ({ onRegisterSuccess, onGoToLogin }) => (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-gray-900/30 border border-green-900/50 rounded-2xl p-8">
-        <h2 className="text-2xl font-bold text-white mb-6 text-center">Criar Conta</h2>
-        <button 
-          onClick={() => onRegisterSuccess({ 
-            id: '1', 
-            email: 'novousuario@exemplo.com', 
-            role: 'user', 
-            credits: 3 
-          })}
-          className="w-full bg-green-600 hover:bg-green-500 text-black font-bold py-3 rounded-lg transition"
-        >
-          Criar Conta Gratuita
-        </button>
-        <button 
-          onClick={onGoToLogin}
-          className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 rounded-lg transition mt-4"
-        >
-          Voltar ao Login
-        </button>
-      </div>
-    </div>
-  );
+  // --- RENDER ---
 
   if (isAuthLoading) return <LoadingState />;
 
   if (currentView === 'login') {
-    return <LoginView onLoginSuccess={handleLoginSuccess} onGoToRegister={() => setCurrentView('register')} />;
+      return (
+        <Login 
+            onLoginSuccess={handleLoginSuccess} 
+            onGoToRegister={() => setCurrentView('register')} 
+            onBack={() => setCurrentView('app')}
+        />
+      );
   }
 
   if (currentView === 'register') {
-    return <RegisterView onRegisterSuccess={handleLoginSuccess} onGoToLogin={() => setCurrentView('login')} />;
+      return <Register 
+          onRegisterSuccess={handleLoginSuccess}
+          onGoToLogin={() => setCurrentView('login')} 
+      />;
+  }
+
+  if (currentView === 'docs') {
+      return <Documentation mode="user" onBack={() => setCurrentView('app')} />;
+  }
+
+  if (currentView === 'admin-docs') {
+      return <Documentation mode="admin" onBack={() => setCurrentView('app')} />;
+  }
+
+  if (currentView === 'user-dashboard' && user) {
+      return <UserDashboard 
+          user={user}
+          credits={credits}
+          history={history}
+          onBack={() => setCurrentView('app')}
+          onOpenPro={() => {
+            setCurrentView('app');
+            setShowUpgradeModal(true);
+          }}
+          onOpenAdmin={() => {
+              if (user.role === 'admin') setCurrentView('admin-dashboard');
+          }}
+      />;
+  }
+
+  if (currentView === 'admin-dashboard' && user?.role === 'admin') {
+      return <AdminDashboard 
+          onBack={() => setCurrentView('app')}
+          onOpenDocs={() => setCurrentView('admin-docs')}
+          currentUserCredits={credits}
+          onUpdateUserCredits={setCredits}
+          plans={plans}
+          onUpdatePlans={setPlans}
+          appConfig={appConfig}
+          onUpdateAppConfig={setAppConfig}
+      />;
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-black text-gray-300 font-sans">
+    <div className="min-h-screen flex flex-col bg-black text-gray-300 font-sans selection:bg-green-900 selection:text-green-100">
       
       <Header 
         credits={credits} 
-        onOpenPro={() => setCurrentView('login')}
-        onOpenDocs={() => alert('Documentação em breve!')}
-        onOpenProfile={() => user ? console.log('Abrir perfil') : setCurrentView('login')}
+        onOpenPro={() => setShowUpgradeModal(true)}
+        onOpenDocs={() => setCurrentView('docs')}
+        onOpenProfile={() => user ? setCurrentView('user-dashboard') : setCurrentView('login')}
         appConfig={appConfig}
       />
 
       <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-8 md:py-12 flex flex-col gap-8">
         
         {/* Intro Section */}
-        <div className="text-center space-y-4">
+        <div className="text-center space-y-4 animate-fade-in-down">
           <h2 className="text-4xl md:text-6xl font-bold tracking-tighter text-white">
             Notícias com <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600">IA & SEO</span>
           </h2>
@@ -427,31 +314,55 @@ const App: React.FC = () => {
             onSubmit={handleGenerate}
             isLoading={isLoading}
             credits={credits}
-            onOpenPro={() => setCurrentView('login')}
+            onOpenPro={() => setShowUpgradeModal(true)}
             onLoginRequired={() => setCurrentView('login')}
             isLoggedIn={!!user}
           />
         </div>
 
         {error && (
-          <div className="bg-red-900/20 border border-red-900/50 text-red-400 p-4 rounded-xl text-center">
+          <div className="bg-red-900/20 border border-red-900/50 text-red-400 p-4 rounded-xl text-center animate-pulse">
             ⚠️ {error}
           </div>
         )}
 
         {generatedNews && (
-          <div className="space-y-6 pb-12">
-             <div className="flex justify-between items-center bg-black border border-green-900/30 p-4 rounded-xl">
+          <div className="animate-fade-in space-y-6 pb-12">
+             
+             <div className="flex justify-between items-center bg-black border border-green-900/30 p-4 rounded-xl sticky top-20 z-20 shadow-lg">
                 <div className="flex items-center gap-2">
                     <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
                     <span className="text-green-500 font-mono text-xs uppercase font-bold">Gerado com Sucesso</span>
                 </div>
                 <button 
                   onClick={() => navigator.clipboard.writeText(generatedNews.body)}
-                  className="bg-green-600 hover:bg-green-500 text-black font-bold py-1.5 px-4 rounded text-sm transition"
+                  className="bg-green-600 hover:bg-green-500 text-black font-bold py-1.5 px-4 rounded text-sm transition flex items-center gap-2"
                 >
-                  Copiar Conteúdo
+                  Copiar Markdown
                 </button>
+             </div>
+
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-black p-4 rounded-xl border border-gray-800">
+                   <h4 className="text-gray-500 text-xs uppercase font-bold mb-1">Focus Keyword</h4>
+                   <p className="text-green-400 font-bold font-mono">{generatedNews.seo.focusKeyword}</p>
+                </div>
+                <div className="bg-black p-4 rounded-xl border border-gray-800">
+                   <h4 className="text-gray-500 text-xs uppercase font-bold mb-1">SEO Title</h4>
+                   <p className="text-white text-sm">{generatedNews.seo.seoTitle}</p>
+                </div>
+                <div className="bg-black p-4 rounded-xl border border-gray-800">
+                   <h4 className="text-gray-500 text-xs uppercase font-bold mb-1">URL Slug</h4>
+                   <p className="text-gray-400 text-sm font-mono text-ellipsis overflow-hidden">{generatedNews.seo.slug}</p>
+                </div>
+             </div>
+
+             <div className="bg-gradient-to-r from-gray-900 to-black p-4 rounded-xl border border-gray-800 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded-bl">Midjourney / DALL-E 3</div>
+                <h4 className="text-gray-400 text-xs uppercase font-bold mb-2">Image Prompt</h4>
+                <p className="text-gray-300 text-sm italic font-serif leading-relaxed select-all">
+                  "{generatedNews.imagePrompt}"
+                </p>
              </div>
 
              <div className="bg-white text-black p-8 rounded-xl shadow-2xl">
@@ -463,15 +374,63 @@ const App: React.FC = () => {
                      {generatedNews.body}
                    </div>
                 </div>
+                
+                {generatedNews.sources && generatedNews.sources.length > 0 && (
+                    <div className="mt-8 pt-6 border-t border-gray-200">
+                        <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Fontes Utilizadas</h4>
+                        <ul className="space-y-2">
+                            {generatedNews.sources.map((source, idx) => (
+                                <li key={idx}>
+                                    <a href={source.uri} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm flex items-center gap-2">
+                                        <span>🔗</span> {source.title}
+                                    </a>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
              </div>
+
           </div>
         )}
 
       </main>
 
+      <UpgradeModal 
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        onUpgrade={(planId) => {
+            const plan = plans.find(p => p.id === planId);
+            if (plan) {
+                setCheckoutPlan(plan);
+                setShowUpgradeModal(false);
+                setShowCheckoutModal(true);
+            } else if (planId === 'single') {
+                 setCheckoutPlan({ id: 'single', name: 'Crédito Avulso', price: 5.00, credits: 1, recurrence: 'Pagamento Único', features: [], active: true });
+                 setShowUpgradeModal(false);
+                 setShowCheckoutModal(true);
+            }
+        }}
+        plans={plans}
+        appConfig={appConfig}
+      />
+
+      <CheckoutModal 
+         isOpen={showCheckoutModal}
+         onClose={() => setShowCheckoutModal(false)}
+         plan={checkoutPlan}
+         onConfirm={() => {
+             setShowCheckoutModal(false);
+             if (checkoutPlan) {
+                 setCredits(prev => prev + checkoutPlan.credits);
+                 alert(`Pagamento confirmado! +${checkoutPlan.credits} créditos adicionados.`);
+             }
+         }}
+      />
+
       <footer className="border-t border-green-900/30 mt-12 bg-black py-8 text-center">
          <p className="text-gray-600 text-sm">
-           © {new Date().getFullYear()} {appConfig.appName}. Powered by AI.
+           © {new Date().getFullYear()} {appConfig.appName}. Powered by Google Gemini 2.0 Flash.
          </p>
       </footer>
     </div>
