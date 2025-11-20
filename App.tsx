@@ -17,10 +17,10 @@ import { NEWS_THEMES, NEWS_TONES } from './constants';
 // --- CONSTANTS ---
 
 // No início do App.tsx, depois dos imports
-console.log('=== SUPABASE DEBUG ===');
-console.log('Supabase object:', supabase);
-console.log('Supabase URL:', supabase?.supabaseUrl);
-console.log('isConfigured:', isSupabaseConfigured());
+//console.log('=== SUPABASE DEBUG ===');
+//console.log('Supabase object:', supabase);
+//console.log('Supabase URL:', supabase?.supabaseUrl);
+//console.log('isConfigured:', isSupabaseConfigured());
 
 const INITIAL_PLANS: PlanConfig[] = [
   { 
