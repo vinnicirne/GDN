@@ -1,14 +1,49 @@
-// App.tsx
+// src/App.tsx
 import React, { useState, useEffect } from 'react';
-import { authService } from './services/authService';
-import type { User, PlanConfig, AppConfig, GeneratedNews } from './types';
-import Welcome from './components/Welcome';
-import Login from './components/Login';
-import Register from './components/Register';
-import Dashboard from './components/Dashboard';
-import AdminDashboard from './components/AdminDashboard';
-import NewsGenerator from './components/NewsGenerator';
-import Plans from './components/Plans';
+
+// Interfaces básicas
+interface User {
+  id: string;
+  email: string;
+  role: string;
+  credits: number;
+}
+
+interface PlanConfig {
+  id: string;
+  name: string;
+  price: number;
+  credits: number;
+  features: string[];
+  recurrence: string;
+  active: boolean;
+  recommended?: boolean;
+}
+
+interface AppConfig {
+  appName: string;
+  logoUrl: string;
+  supportEmail: string;
+  whatsappNumber: string;
+  contactMessage: string;
+}
+
+interface GeneratedNews {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: string;
+}
+
+// Serviço de autenticação mock
+const authService = {
+  getCurrentUser: async (): Promise<User | null> => {
+    return null; // Mock - sempre retorna não logado
+  },
+  logout: async (): Promise<void> => {
+    // Mock - não faz nada
+  }
+};
 
 // Planos padrão
 const defaultPlans: PlanConfig[] = [
@@ -83,13 +118,82 @@ const defaultAppConfig: AppConfig = {
 
 type AppView = 'welcome' | 'login' | 'register' | 'dashboard' | 'admin' | 'generator' | 'plans';
 
+// Componentes básicos (mock)
+const Welcome: React.FC<{ onLogin: () => void; onRegister: () => void; onOpenDocs: () => void }> = ({ onLogin, onRegister }) => (
+  <div className="min-h-screen bg-black text-white flex items-center justify-center">
+    <div className="text-center">
+      <h1 className="text-4xl font-bold mb-8">Gerador de Notícias AI</h1>
+      <p className="text-gray-400 mb-8">Bem-vindo! Faça login ou registre-se para começar.</p>
+      <div className="space-x-4">
+        <button 
+          onClick={onLogin}
+          className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold"
+        >
+          Login
+        </button>
+        <button 
+          onClick={onRegister}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold"
+        >
+          Registrar
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+const Login: React.FC<{ onLoginSuccess: (user: User) => void; onGoToRegister: () => void; onBack: () => void }> = ({ onLoginSuccess, onGoToRegister, onBack }) => (
+  <div className="min-h-screen bg-black text-white flex items-center justify-center">
+    <div className="bg-gray-900 p-8 rounded-lg max-w-md w-full">
+      <h2 className="text-2xl font-bold mb-6">Login</h2>
+      <button 
+        onClick={() => onLoginSuccess({ id: '1', email: 'user@test.com', role: 'user', credits: 3 })}
+        className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold mb-4"
+      >
+        Entrar como Teste
+      </button>
+      <div className="flex space-x-2">
+        <button onClick={onBack} className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded">
+          Voltar
+        </button>
+        <button onClick={onGoToRegister} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded">
+          Registrar
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+const Dashboard: React.FC<{ user: User; onLogout: () => void; onGenerateNews: () => void }> = ({ user, onLogout, onGenerateNews }) => (
+  <div className="min-h-screen bg-black text-white p-8">
+    <div className="max-w-4xl mx-auto">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <button onClick={onLogout} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">
+          Logout
+        </button>
+      </div>
+      
+      <div className="bg-gray-900 rounded-lg p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Bem-vindo, {user.email}!</h2>
+        <p className="text-green-400 mb-2">Créditos disponíveis: {user.credits}</p>
+        <p className="text-gray-400">Plano: {user.role === 'admin' ? 'Administrador' : 'Usuário'}</p>
+      </div>
+
+      <button 
+        onClick={onGenerateNews}
+        className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold"
+      >
+        Gerar Nova Notícia
+      </button>
+    </div>
+  </div>
+);
+
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>('welcome');
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [plans, setPlans] = useState<PlanConfig[]>(defaultPlans);
-  const [appConfig, setAppConfig] = useState<AppConfig>(defaultAppConfig);
-  const [generatedNews, setGeneratedNews] = useState<GeneratedNews | null>(null);
 
   // Verificar autenticação ao carregar
   useEffect(() => {
@@ -99,7 +203,6 @@ const App: React.FC = () => {
         const currentUser = await authService.getCurrentUser();
         if (currentUser) {
           setUser(currentUser);
-          // Redirecionar para dashboard se já estiver autenticado
           setCurrentView(currentUser.role === 'admin' ? 'admin' : 'dashboard');
         }
       } catch (error) {
@@ -115,11 +218,6 @@ const App: React.FC = () => {
   // Handlers de autenticação
   const handleLoginSuccess = (userData: User) => {
     setUser(userData);
-    setCurrentView(userData.role === 'admin' ? 'admin' : 'dashboard');
-  };
-
-  const handleRegisterSuccess = (userData: User) => {
-    setUser(userData);
     setCurrentView('dashboard');
   };
 
@@ -128,7 +226,6 @@ const App: React.FC = () => {
       await authService.logout();
       setUser(null);
       setCurrentView('welcome');
-      setGeneratedNews(null);
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
     }
@@ -139,37 +236,7 @@ const App: React.FC = () => {
   const handleGoToRegister = () => setCurrentView('register');
   const handleGoToWelcome = () => setCurrentView('welcome');
   const handleGoToDashboard = () => setCurrentView('dashboard');
-  const handleGoToAdmin = () => setCurrentView('admin');
   const handleGoToGenerator = () => setCurrentView('generator');
-  const handleGoToPlans = () => setCurrentView('plans');
-
-  // Handlers de dados
-  const handleUpdateUserCredits = (credits: number) => {
-    if (user) {
-      setUser({ ...user, credits });
-    }
-  };
-
-  const handleUpdatePlans = (updatedPlans: PlanConfig[]) => {
-    setPlans(updatedPlans);
-  };
-
-  const handleUpdateAppConfig = (config: AppConfig) => {
-    setAppConfig(config);
-  };
-
-  const handleNewsGenerated = (news: GeneratedNews) => {
-    setGeneratedNews(news);
-    // Atualizar créditos do usuário
-    if (user) {
-      handleUpdateUserCredits(user.credits - 1);
-    }
-  };
-
-  const handleOpenDocs = () => {
-    alert('Documentação será aberta em breve!');
-    // Implementar abertura de documentação
-  };
 
   // Renderizar loading
   if (isLoading) {
@@ -191,7 +258,7 @@ const App: React.FC = () => {
           <Welcome
             onLogin={handleGoToLogin}
             onRegister={handleGoToRegister}
-            onOpenDocs={handleOpenDocs}
+            onOpenDocs={() => alert('Documentação em breve!')}
           />
         );
 
@@ -204,15 +271,6 @@ const App: React.FC = () => {
           />
         );
 
-      case 'register':
-        return (
-          <Register
-            onRegisterSuccess={handleRegisterSuccess}
-            onGoToLogin={handleGoToLogin}
-            onBack={handleGoToWelcome}
-          />
-        );
-
       case 'dashboard':
         if (!user) return handleGoToLogin();
         return (
@@ -220,53 +278,24 @@ const App: React.FC = () => {
             user={user}
             onLogout={handleLogout}
             onGenerateNews={handleGoToGenerator}
-            onViewPlans={handleGoToPlans}
-            onOpenDocs={handleOpenDocs}
-            currentNews={generatedNews}
-          />
-        );
-
-      case 'admin':
-        if (!user || user.role !== 'admin') {
-          return handleGoToLogin();
-        }
-        return (
-          <AdminDashboard
-            onBack={handleGoToDashboard}
-            onOpenDocs={handleOpenDocs}
-            currentUserCredits={user?.credits || 0}
-            onUpdateUserCredits={handleUpdateUserCredits}
-            plans={plans}
-            onUpdatePlans={handleUpdatePlans}
-            appConfig={appConfig}
-            onUpdateAppConfig={handleUpdateAppConfig}
           />
         );
 
       case 'generator':
         if (!user) return handleGoToLogin();
         return (
-          <NewsGenerator
-            user={user}
-            onBack={handleGoToDashboard}
-            onNewsGenerated={handleNewsGenerated}
-            onUpdateUserCredits={handleUpdateUserCredits}
-          />
-        );
-
-      case 'plans':
-        if (!user) return handleGoToLogin();
-        return (
-          <Plans
-            user={user}
-            plans={plans}
-            onBack={handleGoToDashboard}
-            onSubscribe={(planId) => {
-              console.log('Assinando plano:', planId);
-              // Implementar lógica de assinatura
-              alert(`Redirecionando para pagamento do plano: ${planId}`);
-            }}
-          />
+          <div className="min-h-screen bg-black text-white flex items-center justify-center">
+            <div className="text-center">
+              <h2 className="text-3xl font-bold mb-4">Gerador de Notícias</h2>
+              <p className="text-gray-400 mb-6">Funcionalidade em desenvolvimento</p>
+              <button 
+                onClick={handleGoToDashboard}
+                className="bg-gray-700 hover:bg-gray-600 text-white px-6 py-3 rounded-lg"
+              >
+                Voltar ao Dashboard
+              </button>
+            </div>
+          </div>
         );
 
       default:
@@ -274,7 +303,7 @@ const App: React.FC = () => {
           <Welcome
             onLogin={handleGoToLogin}
             onRegister={handleGoToRegister}
-            onOpenDocs={handleOpenDocs}
+            onOpenDocs={() => alert('Documentação em breve!')}
           />
         );
     }
