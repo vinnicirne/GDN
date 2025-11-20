@@ -266,29 +266,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  // Testar webhook
-  const testWebhook = async () => {
-    const webhookUrl = systemConfig.mercadoPago.webhookUrl || generateWebhookUrl();
-    
-    if (!webhookUrl) {
-      alert('URL do webhook não configurada');
-      return;
-    }
+  /// No AdminDashboard, atualize a função testWebhook:
+const testWebhook = async () => {
+  const webhookUrl = systemConfig.mercadoPago.webhookUrl || generateWebhookUrl();
+  
+  if (!webhookUrl) {
+    alert('URL do webhook não configurada');
+    return;
+  }
 
-    try {
-      const response = await fetch(webhookUrl, {
-        method: 'GET'
-      });
+  try {
+    const response = await fetch(webhookUrl, {
+      method: 'GET'
+    });
 
-      if (response.ok) {
-        alert('✅ Webhook está respondendo corretamente!');
-      } else {
-        alert('❌ Webhook não está respondendo');
-      }
-    } catch (error) {
-      alert('❌ Erro ao testar webhook: ' + error);
+    const data = await response.json();
+
+    if (response.ok) {
+      alert(`✅ Webhook está funcionando!\n${data.message}`);
+    } else {
+      alert('❌ Webhook não está respondendo');
     }
-  };
+  } catch (error) {
+    alert('❌ Erro ao testar webhook: ' + error);
+  }
+};
 
   // Renderizar Dashboard
   const renderDashboard = () => (
