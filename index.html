@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Gerador de Notícias</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Polyfill para process.env para evitar crash na Vercel/Vite -->
+  <script>
+    window.process = window.process || { env: {} };
+  </script>
   <style>
     /* Custom scrollbar for a better look in dark mode */
     ::-webkit-scrollbar {
@@ -32,7 +36,9 @@
     "react/": "https://aistudiocdn.com/react@^18.2.0/",
     "react-dom/client": "https://aistudiocdn.com/react-dom@^18.2.0/client",
     "react-dom/": "https://aistudiocdn.com/react-dom@^18.2.0/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0"
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.83.0",
+    "dotenv/": "https://aistudiocdn.com/dotenv@^17.2.3/"
   }
 }
 </script>
