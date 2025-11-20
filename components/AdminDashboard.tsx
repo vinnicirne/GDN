@@ -166,13 +166,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  /// Salvar configurações do sistema - VERSÃO CORRIGIDA
+  // Salvar configurações do sistema - VERSÃO CORRIGIDA
 const saveSystemConfig = async () => {
-  setIsSaving(true);
   console.log('🔄 Iniciando salvamento das configurações...');
+  setIsSaving(true);
   
   try {
-    // Verificar se temos conexão com Supabase
+    // Verificar conexão com Supabase
+    console.log('📡 Verificando conexão com Supabase...');
     const { data: testData, error: testError } = await supabase
       .from('configuracoes')
       .select('chave')
@@ -181,18 +182,18 @@ const saveSystemConfig = async () => {
     if (testError) {
       throw new Error(`Erro de conexão com Supabase: ${testError.message}`);
     }
-
     console.log('✅ Conexão com Supabase OK');
 
-    // Preparar configurações para salvar
+    // Preparar configurações para salvar - CORREÇÃO AQUI
     const configsToSave = [
       { 
         chave: 'gemini', 
         valor: {
-          ...systemConfig.gemini,
-          // Garantir que valores numéricos sejam números
+          apiKey: systemConfig.gemini.apiKey || '',
+          model: systemConfig.gemini.model || 'gemini-2.0-flash',
           maxTokens: Number(systemConfig.gemini.maxTokens) || 1000,
-          temperature: Number(systemConfig.gemini.temperature) || 0.7
+          temperature: Number(systemConfig.gemini.temperature) || 0.7,
+          enabled: Boolean(systemConfig.gemini.enabled)
         }, 
         descricao: 'Configurações da API Gemini', 
         categoria: 'api' 
@@ -200,9 +201,9 @@ const saveSystemConfig = async () => {
       { 
         chave: 'mercadopago', 
         valor: {
-          ...systemConfig.mercadoPago,
+          accessToken: systemConfig.mercadoPago.accessToken || '',
+          publicKey: systemConfig.mercadoPago.publicKey || '',
           webhookUrl: systemConfig.mercadoPago.webhookUrl || generateWebhookUrl(),
-          // Garantir que enabled seja booleano
           enabled: Boolean(systemConfig.mercadoPago.enabled)
         }, 
         descricao: 'Configurações do MercadoPago', 
@@ -211,23 +212,21 @@ const saveSystemConfig = async () => {
       { 
         chave: 'app', 
         valor: {
-          ...systemConfig.app,
-          // Garantir campos obrigatórios
           appName: systemConfig.app.appName || 'Gerador de Notícias AI',
           supportEmail: systemConfig.app.supportEmail || '',
           whatsappNumber: systemConfig.app.whatsappNumber || '',
-          contactMessage: systemConfig.app.contactMessage || ''
+          contactMessage: systemConfig.app.contactMessage || '',
+          logoUrl: systemConfig.app.logoUrl || ''
         }, 
         descricao: 'Configurações da Aplicação', 
         categoria: 'app' 
       }
     ];
 
-    console.log('💾 Configurações a salvar:', configsToSave);
+    console.log('💾 Todas as configurações a salvar:', configsToSave);
 
-    // Salvar cada configuração individualmente com tratamento de erro
-    const results = [];
-    for (const config of configsToSave) {
+    // Salvar cada configuração individualmente
+    const savePromises = configsToSave.map(async (config) => {
       console.log(`📝 Salvando configuração: ${config.chave}`, config.valor);
       
       const { data, error } = await supabase
@@ -239,19 +238,22 @@ const saveSystemConfig = async () => {
           categoria: config.categoria,
           updated_at: new Date().toISOString()
         }, {
-          onConflict: 'chave',
-          ignoreDuplicates: false
+          onConflict: 'chave'
         })
         .select();
 
       if (error) {
         console.error(`❌ Erro ao salvar ${config.chave}:`, error);
         throw new Error(`Erro ao salvar ${config.chave}: ${error.message}`);
-      } else {
-        console.log(`✅ ${config.chave} salvo com sucesso:`, data);
-        results.push({ chave: config.chave, success: true });
       }
-    }
+      
+      console.log(`✅ ${config.chave} salvo com sucesso:`, data);
+      return { chave: config.chave, success: true, data };
+    });
+
+    // Esperar todas as promises serem resolvidas
+    const results = await Promise.all(savePromises);
+    console.log('📋 Resultados do salvamento:', results);
 
     // Verificar se todas as configurações foram salvas
     if (results.length === configsToSave.length) {
@@ -261,12 +263,12 @@ const saveSystemConfig = async () => {
       console.log('✅ Todas as configurações salvas com sucesso!');
       alert('✅ Configurações salvas com sucesso!');
       
-      // Recarregar as configurações do banco
+      // Forçar recarregamento dos dados
       setTimeout(() => {
-        window.location.reload(); // Ou recarregar dados via useEffect
-      }, 1000);
+        window.location.reload();
+      }, 1500);
     } else {
-      throw new Error('Algumas configurações não foram salvas');
+      throw new Error(`Apenas ${results.length} de ${configsToSave.length} configurações foram salvas`);
     }
 
   } catch (error: any) {
@@ -371,10 +373,47 @@ const testWebhook = async () => {
     setIsLoading(false);
   }
 };
+	// Função para debug - ver configurações atuais no banco
+	const debugCurrentConfigs = async () => {
+	  console.log('🐛 DEBUG: Buscando configurações atuais do banco...');
+	  
+	  try {
+		const { data, error } = await supabase
+		  .from('configuracoes')
+		  .select('*')
+		  .order('chave');
 
+		if (error) {
+		  console.error('❌ Erro ao buscar configurações:', error);
+		  return;
+		}
+
+		console.log('📊 Configurações atuais no banco:', data);
+		alert(`Configurações no banco: ${data?.length || 0} registros. Verifique o console.`);
+		
+	  } catch (error) {
+		console.error('❌ Erro no debug:', error);
+	  }
+	};
   // Renderizar Dashboard
   const renderDashboard = () => (
-    <div className="space-y-6">
+    
+			{/* Botões de Debug - REMOVA DEPOIS */}
+	<div className="flex justify-end gap-4 mb-4 border-t border-gray-700 pt-4">
+	  <button 
+		onClick={debugCurrentConfigs}
+		className="bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded-lg transition text-sm"
+	  >
+		🐛 Ver Configs Atuais
+	  </button>
+	  <button 
+		onClick={testSaveSimple}
+		className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg transition text-sm"
+	  >
+		🧪 Teste Simples
+	  </button>
+	</div>
+	<div className="space-y-6">
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-black border border-green-900/30 rounded-xl p-6">
