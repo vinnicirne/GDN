@@ -165,74 +165,76 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  // Salvar configurações do sistema
-  const saveSystemConfig = async () => {
-    try {
-      // Salvar cada configuração individualmente
-      const configsToSave = [
-        { 
-          chave: 'gemini', 
-          valor: systemConfig.gemini, 
-          descricao: 'Configurações da API Gemini', 
-          categoria: 'api' 
-        },
-        { 
-          chave: 'mercadopago', 
-          valor: {
-            ...systemConfig.mercadoPago,
-            webhookUrl: systemConfig.mercadoPago.webhookUrl || generateWebhookUrl()
-          }, 
-          descricao: 'Configurações do MercadoPago', 
-          categoria: 'pagamento' 
-        },
-        { 
-          chave: 'app', 
-          valor: systemConfig.app, 
-          descricao: 'Configurações da Aplicação', 
-          categoria: 'app' 
-        }
-      ];
-
-      for (const config of configsToSave) {
-        const { error } = await supabase
-          .from('configuracoes')
-          .upsert({
-            chave: config.chave,
-            valor: config.valor,
-            descricao: config.descricao,
-            categoria: config.categoria,
-            created_at: new Date().toISOString()
-          }, {
-            onConflict: 'chave'
-          });
-
-        if (error) throw error;
+  // Salvar configurações do sistema - VERSÃO COM DEBUG
+const saveSystemConfig = async () => {
+  console.log('🔄 Iniciando salvamento das configurações...');
+  
+  try {
+    // Verificar se temos conexão com Supabase
+    console.log('📡 Verificando conexão com Supabase...');
+    
+    // Salvar cada configuração individualmente
+    const configsToSave = [
+      { 
+        chave: 'gemini', 
+        valor: systemConfig.gemini, 
+        descricao: 'Configurações da API Gemini', 
+        categoria: 'api' 
+      },
+      { 
+        chave: 'mercadopago', 
+        valor: {
+          ...systemConfig.mercadoPago,
+          webhookUrl: systemConfig.mercadoPago.webhookUrl || generateWebhookUrl()
+        }, 
+        descricao: 'Configurações do MercadoPago', 
+        categoria: 'pagamento' 
+      },
+      { 
+        chave: 'app', 
+        valor: systemConfig.app, 
+        descricao: 'Configurações da Aplicação', 
+        categoria: 'app' 
       }
+    ];
 
-      // Atualizar o appConfig no componente pai
-      onUpdateAppConfig(systemConfig.app);
+    console.log('💾 Configurações a salvar:', configsToSave);
 
-      alert('Configurações salvas com sucesso!');
-    } catch (error) {
-      console.error('Erro ao salvar configurações:', error);
-      alert('Erro ao salvar configurações');
+    for (const config of configsToSave) {
+      console.log(`📝 Salvando configuração: ${config.chave}`, config.valor);
+      
+      const { data, error } = await supabase
+        .from('configuracoes')
+        .upsert({
+          chave: config.chave,
+          valor: config.valor,
+          descricao: config.descricao,
+          categoria: config.categoria,
+          created_at: new Date().toISOString()
+        }, {
+          onConflict: 'chave'
+        });
+
+      if (error) {
+        console.error(`❌ Erro ao salvar ${config.chave}:`, error);
+        throw error;
+      } else {
+        console.log(`✅ ${config.chave} salvo com sucesso:`, data);
+      }
     }
-  };
 
-  // Testar configuração do Gemini
-  const testGeminiConfig = async () => {
-    if (!systemConfig.gemini.apiKey) {
-      alert('Por favor, configure a API Key do Gemini primeiro');
-      return;
-    }
+    // Atualizar o appConfig no componente pai
+    console.log('🔄 Atualizando appConfig no componente pai...');
+    onUpdateAppConfig(systemConfig.app);
 
-    try {
-      alert('✅ Configuração do Gemini testada com sucesso!');
-    } catch (error) {
-      alert('❌ Erro ao testar configuração do Gemini');
-    }
-  };
+    console.log('✅ Todas as configurações salvas com sucesso!');
+    alert('✅ Configurações salvas com sucesso!');
 
+  } catch (error) {
+    console.error('❌ Erro completo ao salvar configurações:', error);
+    alert('❌ Erro ao salvar configurações. Verifique o console para detalhes.');
+  }
+};
   // Testar configuração do MercadoPago
   const testMercadoPagoConfig = async () => {
     if (!systemConfig.mercadoPago.accessToken || !systemConfig.mercadoPago.publicKey) {
