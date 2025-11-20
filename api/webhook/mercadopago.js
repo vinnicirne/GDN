@@ -1,4 +1,3 @@
-// api/webhook/mercadopago.js
 export default async function handler(req, res) {
   // Configurar CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -12,21 +11,24 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     return res.status(200).json({
       message: 'Webhook MercadoPago funcionando!',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      status: 'online'
     });
   }
 
   if (req.method === 'POST') {
     try {
       const data = req.body;
-      console.log('📥 Webhook recebido:', data);
+      console.log('📥 Webhook MercadoPago recebido:', data);
 
-      // Aqui você processaria o webhook
+      // Aqui você processaria o webhook real
       // Por enquanto, apenas confirmamos recebimento
       
       return res.status(200).json({ 
         received: true,
-        message: 'Webhook processado com sucesso'
+        message: 'Webhook processado com sucesso',
+        type: data.type,
+        id: data.id
       });
 
     } catch (error) {
