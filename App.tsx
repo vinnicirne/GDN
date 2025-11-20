@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import Header from './components/Header';
-import NewsGeneratorForm from './components/NewsGeneratorForm';
+import Header from './components/Header.tsx';
+import NewsGeneratorForm from './components/NewsGeneratorForm.tsx';
 import UpgradeModal from './components/UpgradeModal';
 import CheckoutModal from './components/CheckoutModal';
 import Documentation from './components/Documentation';

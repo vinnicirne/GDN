@@ -1,5 +1,5 @@
 import React from 'react';
-import { NEWS_THEMES, NEWS_TONES } from '../constants';
+import { NEWS_THEMES, NEWS_TONES } from '../constants.ts';
 
 interface NewsGeneratorFormProps {
   theme: string;

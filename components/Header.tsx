@@ -1,6 +1,6 @@
 
 import React from 'react';
-import type { AppConfig } from '../types';
+import type { AppConfig } from '../types.ts';
 
 interface HeaderProps {
   credits: number;

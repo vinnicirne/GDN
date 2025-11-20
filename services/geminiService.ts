@@ -1,7 +1,7 @@
 
 import { GoogleGenAI } from "@google/genai";
-import { supabase } from './supabase';
-import type { GeneratedNews } from '../types';
+import { supabase } from './supabase.ts';
+import type { GeneratedNews } from '../types.ts';
 
 // Função auxiliar para obter a API Key
 const getApiKey = () => {

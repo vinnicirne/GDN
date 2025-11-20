@@ -1,6 +1,6 @@
 
-import { supabase } from './supabase';
-import type { User } from '../types';
+import { supabase } from './supabase.ts';
+import type { User } from '../types.ts';
 
 export const authService = {
   async login(email: string, password: string): Promise<User> {
