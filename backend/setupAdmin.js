@@ -1,88 +1,73 @@
-// Arquivo: backend/setupAdmin.js (Temporário)
+// Arquivo: backend/setupAdmin.js
+// COMO RODAR: 
+// 1. Certifique-se de ter as variáveis de ambiente carregadas (dotenv) ou defina antes de rodar.
+// 2. No terminal: node backend/setupAdmin.js
 
-
-
-import supabase from './supabaseClient.js'; // Cliente Supabase com SERVICE_KEY
-
-
-
-// Função que cria o usuário de forma segura
+import supabase from './supabaseClient.js'; // Certifique-se que este client usa a SERVICE_ROLE_KEY
 
 const setupSuperAdmin = async () => {
+    // --- DADOS DO SUPER ADMIN ---
+    const EMAIL_ADMIN = 'agenciaiconedigital@gmail.com'; 
+    const PASSWORD_ADMIN = '@@Vinni1105@@'; 
+    const USER_NAME = 'Super Admin Vinni';
 
-    // ⚠️ SUBSTITUA O EMAIL E A SENHA QUE VOCÊ VAI USAR PARA ACESSAR ⚠️
+    console.log(`🚀 Iniciando configuração para: ${EMAIL_ADMIN}...`);
 
-    const EMAIL_ADMIN = 'seu_email@dominio.com'; 
-
-    const PASSWORD_ADMIN = 'SuaSenhaSuperSecretaAqui123'; 
-
-
-
-    console.log(`Tentando configurar o Superadmin: ${EMAIL_ADMIN}`);
-
-
-
-    // 1. Cria o usuário com o hash correto no sistema de autenticação do Supabase
-
+    // 1. Tenta criar o usuário no sistema de Autenticação (Auth)
+    // Nota: Se o usuário já existir no Auth, isso retorna erro, mas podemos prosseguir para atualizar a role.
     const { data: authData, error: authError } = await supabase.auth.signUp({
-
-        email: agenciaiconedigital@gmail.com,
-
-        password: @@Vinni1105@@,
-
+        email: EMAIL_ADMIN,
+        password: PASSWORD_ADMIN,
+        options: {
+            data: { name: USER_NAME } // Metadados opcionais
+        }
     });
 
-
+    let userId;
 
     if (authError) {
-
-        console.error('ERRO AO CRIAR USUÁRIO:', authError);
-
-        return { success: false, message: authError.message };
-
+        console.warn(`⚠️ Aviso no Auth (pode ser que já exista): ${authError.message}`);
+        // Se já existe, precisamos buscar o ID dele para garantir
+        const { data: userData } = await supabase.from('usuarios').select('id').eq('email', EMAIL_ADMIN).single();
+        
+        if (userData) {
+             userId = userData.id;
+             console.log(`✅ Usuário encontrado no banco com ID: ${userId}`);
+        } else {
+             console.error("❌ Erro fatal: Usuário existe no Auth mas não no Banco. Não consigo prosseguir.");
+             return;
+        }
+    } else {
+        userId = authData.user.id;
+        console.log(`✅ Usuário criado no Auth com ID: ${userId}`);
     }
 
+    if (!userId) {
+        console.error("❌ Não foi possível obter o ID do usuário.");
+        return;
+    }
 
-
-    const newUserId = authData.user.id;
-
-
-
-    // 2. Atualiza a role e o saldo na sua tabela 'usuarios'
-
+    // 2. Cria ou Atualiza a tabela 'usuarios' com permissões de SUPER ADMIN
+    // Usamos 'upsert' para garantir: se não existir, cria; se existir, atualiza.
     const { error: dbError } = await supabase
-
         .from('usuarios')
-
-        .update({ role: 'super_admin', creditos_saldo: 999999 })
-
-        .eq('id', newUserId);
-
-
+        .upsert({ 
+            id: userId,
+            email: EMAIL_ADMIN,
+            name: USER_NAME,
+            role: 'super_admin',       // <--- O PULO DO GATO
+            creditos_saldo: 999999,    // <--- CRÉDITOS INFINITOS
+            plan: 'Enterprise',
+            status: 'active',
+            created_at: new Date().toISOString()
+        }, { onConflict: 'id' });
 
     if (dbError) {
-
-        console.error('ERRO AO ATUALIZAR ROLE:', dbError);
-
-        return { success: false, message: dbError.message };
-
+        console.error('❌ ERRO AO SALVAR NO BANCO:', dbError.message);
+    } else {
+        console.log(`🎉 SUCESSO! O usuário ${EMAIL_ADMIN} agora é um SUPER ADMIN.`);
     }
-
-
-
-    return { success: true, message: `Sucesso! O Superadmin ${EMAIL_ADMIN} está configurado.` };
-
 };
 
-
-
-// Esta função será executada ao acessar o endpoint /api/setup-admin
-
-export default async (req, res) => {
-
-    const result = await setupSuperAdmin();
-
-    res.status(200).json(result);
-
-};
-
+// Executa a função automaticamente ao rodar o script com node
+setupSuperAdmin();
