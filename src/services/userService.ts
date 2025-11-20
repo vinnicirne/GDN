@@ -1,38 +1,36 @@
-import { supabase } from './supabase';
+import { createClient } from '@supabase/supabase-js';
 
-export const userService = {
-  // Função para debitar créditos do usuário
-  async debitCredits(userId: string, currentBalance: number) {
-    if (currentBalance <= 0) throw new Error("Saldo insuficiente.");
-
-    const newBalance = currentBalance - 1;
-
-    // Atualiza no banco
-    const { error } = await supabase
-        .from('usuarios')
-        .update({ creditos_saldo: newBalance })
-        .eq('id', userId);
-    
-    if (error) {
-      console.error("Erro ao debitar créditos:", error);
-      throw new Error("Erro ao atualizar saldo.");
-    }
-
-    return newBalance;
-  },
-
-  // Função para salvar o histórico da notícia gerada
-  async saveHistory(userId: string, promptText: string, responseJson: any) {
-      const { error } = await supabase.from('historico_prompts').insert([{
-          user_id: userId,
-          prompt_text: promptText,
-          response_json: responseJson,
-          timestamp: new Date().toISOString()
-      }]);
-
-      if (error) {
-        console.error("Erro ao salvar histórico:", error);
-        // Não lançamos erro aqui para não travar a UI se apenas o histórico falhar
-      }
+// Função para obter variáveis de ambiente de forma segura
+const getEnvVar = (key: string): string => {
+  // Verifica se estamos no ambiente Vite (import.meta.env)
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env[key] || '';
   }
+  // Fallback para process.env (caso necessário)
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env[key] || '';
+  }
+  return '';
 };
+
+const supabaseUrl = getEnvVar('VITE_SUPABASE_URL');
+const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY');
+
+export const isSupabaseConfigured = (): boolean => {
+  return !!supabaseUrl && !!supabaseAnonKey;
+};
+
+// Cria a instância do cliente Supabase
+// Se as chaves não existirem, usa valores placeholder para não quebrar a compilação,
+// mas a função isSupabaseConfigured impedirá o uso real.
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder-url.supabase.co',
+  supabaseAnonKey || 'placeholder-key',
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  }
+);
