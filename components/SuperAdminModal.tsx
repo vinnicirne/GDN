@@ -24,9 +24,12 @@ const SuperAdminModal: React.FC<SuperAdminModalProps> = ({ isOpen, onClose, onLo
 
     try {
       const user = await authService.login(email, password);
-      if (user.role !== 'admin') {
-          throw new Error('Acesso negado: Este usuário não possui privilégios administrativos.');
+      
+      // Verificação de segurança no Frontend (Reforçada por RLS no Backend)
+      if (user.role !== 'admin' && user.role !== 'super_admin') {
+          throw new Error('Permissão negada: Esta conta não possui privilégios de Administrador.');
       }
+      
       onLoginSuccess(user);
       onClose();
     } catch (err) {
@@ -47,7 +50,7 @@ const SuperAdminModal: React.FC<SuperAdminModalProps> = ({ isOpen, onClose, onLo
         {/* Header de Alerta */}
         <div className="bg-red-900/20 p-4 border-b border-red-900 flex items-center gap-3">
             <div className="bg-red-600 text-black font-bold px-2 py-0.5 text-xs uppercase tracking-wider animate-pulse">
-                Restricted
+                System Locked
             </div>
             <h2 className="text-red-500 font-mono text-sm uppercase tracking-widest font-bold">
                 Acesso Administrativo
@@ -67,47 +70,45 @@ const SuperAdminModal: React.FC<SuperAdminModalProps> = ({ isOpen, onClose, onLo
                  </svg>
                </div>
                <p className="text-red-400 text-xs font-mono">
-                   Insira suas credenciais reais de administrador.
+                   Insira credenciais de nível root.
                </p>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-4">
+            <form onSubmit={handleLogin} className="space-y-5">
                 {error && (
-                    <div className="bg-red-950 border border-red-800 text-red-400 px-3 py-2 text-xs font-mono">
+                    <div className="bg-red-950 border border-red-800 text-red-400 px-3 py-2 text-xs font-mono text-center">
                         {error}
                     </div>
                 )}
 
                 <div>
-                    <label className="block text-red-700 text-xs uppercase font-bold mb-1">Email</label>
+                    <label className="block text-red-700 text-xs uppercase font-bold mb-1.5 tracking-wider">Email</label>
                     <input 
                         type="email" 
                         required
                         value={email}
                         onChange={e => setEmail(e.target.value)}
-                        className="w-full bg-black border border-red-900/50 text-red-100 p-2 text-sm font-mono focus:border-red-600 outline-none placeholder-red-900/30"
-                        placeholder="Digite seu email"
+                        className="w-full bg-black border border-red-900/50 text-red-100 p-3 text-sm font-mono focus:border-red-500 focus:shadow-[0_0_10px_rgba(220,38,38,0.3)] outline-none transition-all"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-red-700 text-xs uppercase font-bold mb-1">Senha</label>
+                    <label className="block text-red-700 text-xs uppercase font-bold mb-1.5 tracking-wider">Senha</label>
                     <input 
                         type="password" 
                         required
                         value={password}
                         onChange={e => setPassword(e.target.value)}
-                        className="w-full bg-black border border-red-900/50 text-red-100 p-2 text-sm font-mono focus:border-red-600 outline-none placeholder-red-900/30"
-                        placeholder="Sua senha"
+                        className="w-full bg-black border border-red-900/50 text-red-100 p-3 text-sm font-mono focus:border-red-500 focus:shadow-[0_0_10px_rgba(220,38,38,0.3)] outline-none transition-all"
                     />
                 </div>
 
                 <button 
                     type="submit" 
                     disabled={isLoading}
-                    className="w-full bg-red-900 hover:bg-red-800 text-white font-bold py-3 text-xs uppercase tracking-widest border border-red-700 transition shadow-[0_0_15px_rgba(220,38,38,0.2)] mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-gradient-to-r from-red-900 to-red-950 hover:from-red-800 hover:to-red-900 text-white font-bold py-3.5 text-xs uppercase tracking-widest border border-red-700 transition shadow-[0_0_20px_rgba(185,28,28,0.2)] mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    {isLoading ? 'Verificando Permissões...' : 'Acessar Painel'}
+                    {isLoading ? 'Verificar Acesso...' : 'Entrar'}
                 </button>
             </form>
         </div>

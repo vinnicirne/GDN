@@ -11,31 +11,35 @@ export const authService = {
     if (error) throw error;
     if (!data.user) throw new Error("Usuário não encontrado.");
 
-    // Fetch profile
+    // Tenta buscar o perfil na tabela pública 'usuarios'
     const { data: profile, error: profileError } = await supabase
         .from('usuarios')
         .select('*')
         .eq('id', data.user.id)
         .single();
 
-    if (profileError) {
-       console.warn("Perfil não encontrado na tabela publica, usando metadados de auth");
-    }
+    // FALLBACK ROBUSTO:
+    // Se o trigger do Supabase falhou ou não rodou, o 'profile' será null.
+    // Nesse caso, montamos um objeto de usuário temporário usando os metadados do Auth
+    // para que o usuário não fique bloqueado.
+    
+    const roleFromTable = profile?.role;
+    const roleFromMeta = data.user.user_metadata?.role;
+    
+    const finalRole = (roleFromTable === 'super_admin' || roleFromTable === 'admin' || roleFromMeta === 'super_admin' || roleFromMeta === 'admin') 
+        ? 'admin' 
+        : 'user';
 
-    // Verifica role na tabela publica OU nos metadados do usuário
-    const isAdmin = 
-        profile?.role === 'super_admin' || 
-        profile?.role === 'admin' || 
-        data.user.user_metadata?.role === 'admin' ||
-        data.user.user_metadata?.role === 'super_admin';
+    const userName = profile?.name || data.user.user_metadata?.name || 'Usuário';
+    const userCredits = profile?.creditos_saldo ?? 3; // Default se não houver banco
 
     return {
         id: data.user.id,
-        name: profile?.name || data.user.user_metadata?.name || 'Usuário',
+        name: userName,
         email: data.user.email || '',
-        role: isAdmin ? 'admin' : 'user',
+        role: finalRole,
         plan: profile?.plan || 'Gratuito',
-        credits: profile?.creditos_saldo ?? 0,
+        credits: userCredits,
         status: profile?.status || 'active',
         created_at: data.user.created_at
     };
@@ -44,22 +48,30 @@ export const authService = {
   async register(name: string, email: string, password: string): Promise<User> {
     if (!isSupabaseConfigured()) throw new Error("Supabase não configurado. Impossível registrar usuários.");
 
+    // Ao registrar, passamos 'name' nos metadados.
+    // O Trigger do Supabase (se configurado corretamente) usará isso para preencher public.usuarios.
     const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { name, role: 'user' } } // Default role in metadata
+        options: { 
+            data: { 
+                name, 
+                role: 'user' 
+            } 
+        }
     });
 
     if (error) throw error;
     if (!data.user) throw new Error("Erro ao criar conta.");
 
+    // Retorna um objeto otimista imediatamente
     return {
         id: data.user.id,
         name: name,
         email: email,
         role: 'user',
         plan: 'Gratuito',
-        credits: 3,
+        credits: 3, 
         status: 'active'
     };
   },
@@ -82,19 +94,23 @@ export const authService = {
           .eq('id', session.user.id)
           .single();
         
-        const isAdmin = 
-            profile?.role === 'super_admin' || 
-            profile?.role === 'admin' || 
-            session.user.user_metadata?.role === 'admin' ||
-            session.user.user_metadata?.role === 'super_admin';
+        const roleFromTable = profile?.role;
+        const roleFromMeta = session.user.user_metadata?.role;
+        
+        const finalRole = (roleFromTable === 'super_admin' || roleFromTable === 'admin' || roleFromMeta === 'super_admin' || roleFromMeta === 'admin') 
+            ? 'admin' 
+            : 'user';
+        
+        const userName = profile?.name || session.user.user_metadata?.name || 'Usuário';
+        const userCredits = profile?.creditos_saldo ?? 3;
       
          return {
           id: session.user.id,
-          name: profile?.name || session.user.user_metadata?.name || 'Usuário',
+          name: userName,
           email: session.user.email || '',
-          role: isAdmin ? 'admin' : 'user',
+          role: finalRole,
           plan: profile?.plan || 'Gratuito',
-          credits: profile?.creditos_saldo ?? 0,
+          credits: userCredits,
           status: profile?.status || 'active',
           created_at: session.user.created_at
       };
