@@ -266,7 +266,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  /// No AdminDashboard, atualize a função testWebhook:
+  // No AdminDashboard, atualize a função testWebhook:
 const testWebhook = async () => {
   const webhookUrl = systemConfig.mercadoPago.webhookUrl || generateWebhookUrl();
   
