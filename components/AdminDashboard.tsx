@@ -607,15 +607,14 @@ const saveSystemConfig = async () => {
           </div>
         </div>
 
-        <div className="flex gap-4">
-          <button 
-            onClick={testGeminiConfig}
-            className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg transition"
-          >
-            Testar Conexão
-          </button>
-        </div>
-      </div>
+			<div className="flex gap-4">
+	  <button 
+		onClick={testGeminiConfig}  {/* ← CORRIGIDO: testGeminiConfig */}
+		className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg transition"
+	  >
+		Testar Conexão
+	  </button>
+	</div>
 
       {/* Configurações do MercadoPago */}
       <div className="bg-black border border-green-900/30 rounded-xl p-6 space-y-6">
