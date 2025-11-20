@@ -1,4 +1,3 @@
-
 export interface GeneratedNews {
   id?: string;
   title: string;
@@ -48,7 +47,7 @@ export interface User {
   status?: string;
   created_at?: string;
 }
-// Adicione ao seu arquivo types.ts
+
 export interface MercadoPagoConfig {
   accessToken: string;
   publicKey: string;

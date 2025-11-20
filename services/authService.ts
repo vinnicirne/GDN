@@ -8,7 +8,6 @@ export const authService = {
     if (error) throw error;
     if (!data.user) throw new Error("Usuário não encontrado.");
 
-    // Fetch profile
     const { data: profile, error: profileError } = await supabase
         .from('usuarios')
         .select('*')
