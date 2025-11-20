@@ -1,7 +1,4 @@
-
-import { supabase } from './supabase.ts';
-import type { User } from '../types.ts';
-
+// authService.ts - PRODUÇÃO
 export const authService = {
   async login(email: string, password: string): Promise<User> {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -9,7 +6,7 @@ export const authService = {
     if (error) throw error;
     if (!data.user) throw new Error("Usuário não encontrado.");
 
-    // Fetch profile
+    // Fetch profile from produção table
     const { data: profile, error: profileError } = await supabase
         .from('usuarios')
         .select('*')
@@ -22,12 +19,12 @@ export const authService = {
 
     return {
         id: data.user.id,
-        name: profile?.name || data.user.user_metadata?.name || 'Usuário',
+        name: profile?.nome || data.user.user_metadata?.name || 'Usuário',
         email: data.user.email || '',
         role: (profile?.role === 'super_admin' || profile?.role === 'admin') ? 'admin' : 'user',
-        plan: profile?.plan || 'Gratuito',
+        plan: 'Gratuito', // Podemos ajustar depois com join com planos
         credits: profile?.creditos_saldo ?? 0,
-        status: profile?.status || 'active',
+        status: 'active',
         created_at: data.user.created_at
     };
   },
@@ -42,6 +39,22 @@ export const authService = {
     if (error) throw error;
     if (!data.user) throw new Error("Erro ao criar conta.");
 
+    // Criar usuário na tabela de produção
+    const { error: profileError } = await supabase
+        .from('usuarios')
+        .insert([{
+            id: data.user.id,
+            email: email,
+            nome: name,
+            role: 'user',
+            creditos_saldo: 3,
+            data_cadastro: new Date().toISOString()
+        }]);
+
+    if (profileError) {
+        console.error("Erro ao criar perfil:", profileError);
+    }
+
     return {
         id: data.user.id,
         name: name,
@@ -51,10 +64,6 @@ export const authService = {
         credits: 3,
         status: 'active'
     };
-  },
-
-  async logout(): Promise<void> {
-    await supabase.auth.signOut();
   },
 
   async getCurrentSession(): Promise<User | null> {
@@ -70,12 +79,12 @@ export const authService = {
       
          return {
           id: session.user.id,
-          name: profile?.name || session.user.user_metadata?.name || 'Usuário',
+          name: profile?.nome || session.user.user_metadata?.name || 'Usuário',
           email: session.user.email || '',
           role: (profile?.role === 'super_admin' || profile?.role === 'admin') ? 'admin' : 'user',
-          plan: profile?.plan || 'Gratuito',
+          plan: 'Gratuito',
           credits: profile?.creditos_saldo ?? 0,
-          status: profile?.status || 'active',
+          status: 'active',
           created_at: session.user.created_at
       };
     } catch (error) {
