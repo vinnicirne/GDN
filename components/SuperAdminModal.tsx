@@ -25,9 +25,8 @@ const SuperAdminModal: React.FC<SuperAdminModalProps> = ({ isOpen, onClose, onLo
     try {
       const user = await authService.login(email, password);
       
-      // Verificação de segurança no Frontend (Reforçada por RLS no Backend)
-      if (user.role !== 'admin' && user.role !== 'super_admin') {
-          throw new Error('Permissão negada: Esta conta não possui privilégios de Administrador.');
+      if (user.role !== 'admin') {
+          throw new Error('Acesso Negado: Esta conta não possui privilégios de administrador.');
       }
       
       onLoginSuccess(user);
@@ -36,7 +35,7 @@ const SuperAdminModal: React.FC<SuperAdminModalProps> = ({ isOpen, onClose, onLo
       if (err instanceof Error) {
         setError(err.message);
       } else {
-        setError('Falha na autenticação. Verifique suas credenciais.');
+        setError('Falha na autenticação.');
       }
     } finally {
       setIsLoading(false);
@@ -44,71 +43,67 @@ const SuperAdminModal: React.FC<SuperAdminModalProps> = ({ isOpen, onClose, onLo
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/95 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-md border-2 border-red-900 bg-black rounded-none shadow-[0_0_50px_rgba(153,27,27,0.3)] relative overflow-hidden">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in">
+      <div className="w-full max-w-md bg-gray-900 border border-red-900/50 rounded-xl shadow-2xl overflow-hidden">
         
-        {/* Header de Alerta */}
-        <div className="bg-red-900/20 p-4 border-b border-red-900 flex items-center gap-3">
-            <div className="bg-red-600 text-black font-bold px-2 py-0.5 text-xs uppercase tracking-wider animate-pulse">
-                System Locked
-            </div>
-            <h2 className="text-red-500 font-mono text-sm uppercase tracking-widest font-bold">
-                Acesso Administrativo
+        <div className="bg-red-900/10 p-4 border-b border-red-900/30 flex items-center justify-between">
+            <h2 className="text-red-500 font-bold uppercase tracking-wider text-sm">
+                Painel de Controle
             </h2>
-            <button onClick={onClose} className="ml-auto text-red-800 hover:text-red-500">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
+            <button onClick={onClose} className="text-gray-500 hover:text-white transition">
+                ✕
             </button>
         </div>
 
         <div className="p-8">
-            <div className="mb-6 text-center">
-               <div className="w-16 h-16 bg-red-900/10 rounded-full border border-red-900/50 flex items-center justify-center mx-auto mb-3">
-                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-red-600">
+            <div className="text-center mb-6">
+               <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-3 text-red-500 border border-red-500/20">
+                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                  </svg>
                </div>
-               <p className="text-red-400 text-xs font-mono">
-                   Insira credenciais de nível root.
+               <p className="text-gray-400 text-sm">
+                   Área restrita para super administradores.
                </p>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-5">
+            <form onSubmit={handleLogin} className="space-y-4">
                 {error && (
-                    <div className="bg-red-950 border border-red-800 text-red-400 px-3 py-2 text-xs font-mono text-center">
+                    <div className="bg-red-900/20 border border-red-500/30 text-red-400 px-3 py-2 text-xs rounded text-center">
                         {error}
                     </div>
                 )}
 
                 <div>
-                    <label className="block text-red-700 text-xs uppercase font-bold mb-1.5 tracking-wider">Email</label>
+                    <label className="block text-gray-500 text-xs uppercase font-bold mb-1">Email</label>
                     <input 
                         type="email" 
                         required
                         value={email}
                         onChange={e => setEmail(e.target.value)}
-                        className="w-full bg-black border border-red-900/50 text-red-100 p-3 text-sm font-mono focus:border-red-500 focus:shadow-[0_0_10px_rgba(220,38,38,0.3)] outline-none transition-all"
+                        className="w-full bg-black border border-gray-800 rounded-lg p-3 text-white focus:border-red-500 outline-none transition placeholder-gray-700"
+                        placeholder="admin@exemplo.com"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-red-700 text-xs uppercase font-bold mb-1.5 tracking-wider">Senha</label>
+                    <label className="block text-gray-500 text-xs uppercase font-bold mb-1">Senha</label>
                     <input 
                         type="password" 
                         required
                         value={password}
                         onChange={e => setPassword(e.target.value)}
-                        className="w-full bg-black border border-red-900/50 text-red-100 p-3 text-sm font-mono focus:border-red-500 focus:shadow-[0_0_10px_rgba(220,38,38,0.3)] outline-none transition-all"
+                        className="w-full bg-black border border-gray-800 rounded-lg p-3 text-white focus:border-red-500 outline-none transition placeholder-gray-700"
+                        placeholder="••••••••"
                     />
                 </div>
 
                 <button 
                     type="submit" 
                     disabled={isLoading}
-                    className="w-full bg-gradient-to-r from-red-900 to-red-950 hover:from-red-800 hover:to-red-900 text-white font-bold py-3.5 text-xs uppercase tracking-widest border border-red-700 transition shadow-[0_0_20px_rgba(185,28,28,0.2)] mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition shadow-lg shadow-red-900/20 mt-2 disabled:opacity-50 hover:scale-[1.02] active:scale-95 transform"
                 >
-                    {isLoading ? 'Verificar Acesso...' : 'Entrar'}
+                    {isLoading ? 'Verificando Permissões...' : 'Acessar Sistema'}
                 </button>
             </form>
         </div>

@@ -11,45 +11,64 @@ export const authService = {
     if (error) throw error;
     if (!data.user) throw new Error("Usuário não encontrado.");
 
-    // Tenta buscar o perfil na tabela pública 'usuarios'
+    // 1. Tenta buscar o perfil na tabela pública 'usuarios'
     const { data: profile, error: profileError } = await supabase
         .from('usuarios')
         .select('*')
         .eq('id', data.user.id)
-        .single();
+        .maybeSingle();
 
-    // FALLBACK ROBUSTO:
-    // Se o trigger do Supabase falhou ou não rodou, o 'profile' será null.
-    // Nesse caso, montamos um objeto de usuário temporário usando os metadados do Auth
-    // para que o usuário não fique bloqueado.
-    
-    const roleFromTable = profile?.role;
-    const roleFromMeta = data.user.user_metadata?.role;
-    
-    const finalRole = (roleFromTable === 'super_admin' || roleFromTable === 'admin' || roleFromMeta === 'super_admin' || roleFromMeta === 'admin') 
-        ? 'admin' 
-        : 'user';
+    let finalProfile = profile;
 
-    const userName = profile?.name || data.user.user_metadata?.name || 'Usuário';
-    const userCredits = profile?.creditos_saldo ?? 3; // Default se não houver banco
+    // 2. AUTO-FIX (SELF-HEALING) no Login
+    // Se o perfil não existir, cria agora.
+    if (!finalProfile) {
+         console.warn("Perfil público não encontrado. Tentando criar registro de emergência...");
+         
+         const newProfile = {
+            id: data.user.id,
+            email: data.user.email,
+            name: data.user.user_metadata?.name || 'Usuário',
+            role: 'user',
+            plan: 'Gratuito',
+            creditos_saldo: 3,
+            status: 'active'
+         };
+         
+         const { data: created, error: insertError } = await supabase
+            .from('usuarios')
+            .insert([newProfile])
+            .select()
+            .single();
+
+         if (!insertError && created) {
+            finalProfile = created;
+         } else {
+            console.error("Não foi possível criar o perfil público (Erro DB):", insertError);
+            finalProfile = newProfile;
+         }
+    }
+
+    // Normalização de Roles
+    const rawRole = finalProfile?.role || 'user';
+    const normalizedRole = (rawRole === 'super_admin' || rawRole === 'admin') ? 'admin' : 'user';
 
     return {
         id: data.user.id,
-        name: userName,
+        name: finalProfile?.name || 'Usuário',
         email: data.user.email || '',
-        role: finalRole,
-        plan: profile?.plan || 'Gratuito',
-        credits: userCredits,
-        status: profile?.status || 'active',
+        role: normalizedRole,
+        plan: finalProfile?.plan || 'Gratuito',
+        credits: finalProfile?.creditos_saldo ?? 0,
+        status: finalProfile?.status || 'active',
         created_at: data.user.created_at
     };
   },
 
   async register(name: string, email: string, password: string): Promise<User> {
-    if (!isSupabaseConfigured()) throw new Error("Supabase não configurado. Impossível registrar usuários.");
+    if (!isSupabaseConfigured()) throw new Error("Supabase não configurado.");
 
-    // Ao registrar, passamos 'name' nos metadados.
-    // O Trigger do Supabase (se configurado corretamente) usará isso para preencher public.usuarios.
+    // 1. Cria autenticação no Supabase Auth
     const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -64,7 +83,27 @@ export const authService = {
     if (error) throw error;
     if (!data.user) throw new Error("Erro ao criar conta.");
 
-    // Retorna um objeto otimista imediatamente
+    // 2. GARANTIA DE PERFIL PÚBLICO
+    // Força a inserção na tabela 'usuarios' mesmo se o Trigger falhar.
+    // O 'upsert' com onConflict evita erros se o trigger já tiver funcionado.
+    const newProfile = {
+        id: data.user.id,
+        name: name,
+        email: email,
+        role: 'user',
+        plan: 'Gratuito',
+        creditos_saldo: 3, // Créditos iniciais
+        status: 'active'
+    };
+
+    const { error: profileError } = await supabase
+        .from('usuarios')
+        .upsert(newProfile, { onConflict: 'id' });
+
+    if (profileError) {
+        console.warn("Aviso: Falha ao sincronizar perfil público:", profileError.message);
+    }
+
     return {
         id: data.user.id,
         name: name,
@@ -72,7 +111,8 @@ export const authService = {
         role: 'user',
         plan: 'Gratuito',
         credits: 3, 
-        status: 'active'
+        status: 'active',
+        created_at: new Date().toISOString()
     };
   },
 
@@ -92,25 +132,19 @@ export const authService = {
           .from('usuarios')
           .select('*')
           .eq('id', session.user.id)
-          .single();
-        
-        const roleFromTable = profile?.role;
-        const roleFromMeta = session.user.user_metadata?.role;
-        
-        const finalRole = (roleFromTable === 'super_admin' || roleFromTable === 'admin' || roleFromMeta === 'super_admin' || roleFromMeta === 'admin') 
-            ? 'admin' 
-            : 'user';
+          .maybeSingle();
         
         const userName = profile?.name || session.user.user_metadata?.name || 'Usuário';
-        const userCredits = profile?.creditos_saldo ?? 3;
-      
+        const rawRole = profile?.role || session.user.user_metadata?.role || 'user';
+        const role = (rawRole === 'super_admin' || rawRole === 'admin') ? 'admin' : 'user';
+
          return {
           id: session.user.id,
           name: userName,
           email: session.user.email || '',
-          role: finalRole,
+          role,
           plan: profile?.plan || 'Gratuito',
-          credits: userCredits,
+          credits: profile?.creditos_saldo ?? 3,
           status: profile?.status || 'active',
           created_at: session.user.created_at
       };
