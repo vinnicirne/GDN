@@ -15,11 +15,16 @@ interface AdminDashboardProps {
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
   onBack, 
-  onOpenDocs 
+  onOpenDocs,
+  currentUserCredits,
+  onUpdateUserCredits,
+  plans,
+  onUpdatePlans,
+  appConfig,
+  onUpdateAppConfig
 }) => {
-  const [activeTab, setActiveTab] = useState<'users' | 'plans' | 'analytics' | 'settings'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'plans' | 'settings' | 'analytics'>('users');
   const [users, setUsers] = useState<User[]>([]);
-  const [plans, setPlans] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -28,43 +33,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     revenue: 0
   });
 
-  // Fetch dados da produção
+  // Fetch Real Users from Supabase PRODUÇÃO
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       
       try {
-        // Buscar usuários
+        // Buscar usuários da tabela de produção
         const { data: usersData, error: usersError } = await supabase
           .from('usuarios')
           .select('*')
-          .order('created_at', { ascending: false });
+          .order('data_cadastro', { ascending: false });
 
         if (usersError) throw usersError;
 
         if (usersData) {
           const mappedUsers: User[] = usersData.map((u: any) => ({
             id: u.id,
-            name: u.name || 'Sem Nome',
+            name: u.nome || 'Sem Nome',
             email: u.email,
             role: u.role === 'super_admin' ? 'admin' : 'user',
-            plan: getPlanName(u.plano_id),
+            plan: u.plano_id ? 'Premium' : 'Gratuito',
             credits: u.creditos_saldo || 0,
             status: u.status || 'active',
-            created_at: u.created_at
+            created_at: u.data_cadastro
           }));
           setUsers(mappedUsers);
         }
 
-        // Buscar planos
-        const { data: plansData } = await supabase
-          .from('planos')
-          .select('*')
-          .order('id');
-        
-        if (plansData) setPlans(plansData);
-
-        // Buscar estatísticas do histórico
+        // Buscar estatísticas
         const { data: historyData } = await supabase
           .from('historico_prompts')
           .select('creditos_consumidos');
@@ -75,7 +72,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           totalUsers: usersData?.length || 0,
           activeUsers: usersData?.filter(u => u.status === 'active').length || 0,
           totalCreditsUsed,
-          revenue: totalCreditsUsed * 0.5
+          revenue: totalCreditsUsed * 0.5 // Exemplo: R$ 0,50 por crédito
         });
 
       } catch (error) {
@@ -88,11 +85,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     fetchData();
   }, []);
 
-  const getPlanName = (planoId: number) => {
-    const plan = plans.find(p => p.id === planoId);
-    return plan?.nome || 'Gratuito';
-  };
-
   const handleUpdateCredits = async (userId: string, newCredits: number) => {
     try {
       const { error } = await supabase
@@ -102,6 +94,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       if (error) throw error;
 
+      // Atualizar lista local
       setUsers(prev => prev.map(user => 
         user.id === userId ? { ...user, credits: newCredits } : user
       ));
@@ -145,12 +138,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
             <div>
               <h1 className="text-2xl font-bold text-white">Painel Administrativo</h1>
-              <p className="text-gray-500 text-sm">Banco de Dados: PRODUÇÃO</p>
+              <p className="text-gray-500 text-sm">Gestão completa da plataforma</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <div className="text-xs font-mono text-green-500 border border-green-900 px-3 py-1.5 rounded-full bg-green-900/20">
-              ✅ BANCO CONFIGURADO
+              PRODUÇÃO
             </div>
             <button 
               onClick={onOpenDocs}
@@ -203,18 +196,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           ))}
         </div>
 
-        {/* Tab Content - Usuários */}
+        {/* Tab Content */}
         {activeTab === 'users' && (
           <div className="bg-black border border-green-900/30 rounded-xl overflow-hidden">
             {isLoading ? (
               <div className="text-center text-gray-500 py-20">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-4"></div>
-                Carregando dados do banco de produção...
+                Carregando dados do banco...
               </div>
             ) : (
               <>
                 <div className="p-4 bg-green-900/10 border-b border-green-900/30">
-                  <h3 className="font-bold text-green-400">Gestão de Usuários - PRODUÇÃO</h3>
+                  <h3 className="font-bold text-green-400">Gestão de Usuários</h3>
                   <p className="text-gray-400 text-sm">Total: {users.length} usuários</p>
                 </div>
                 
@@ -262,11 +255,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 onChange={(e) => handleUpdateCredits(user.id, parseInt(e.target.value) || 0)}
                                 className="w-20 bg-black border border-gray-600 rounded px-2 py-1 text-white text-xs font-mono"
                               />
+                              <span className="text-green-400 font-bold">/{user.plan === 'Gratuito' ? 3 : '∞'}</span>
                             </div>
                           </td>
                           <td className="p-4">
                             <span className={`px-2 py-1 rounded text-xs ${
-                              user.plan !== 'Gratuito' 
+                              user.plan === 'Premium' 
                                 ? 'bg-green-900/30 text-green-400' 
                                 : 'bg-gray-900 text-gray-400'
                             }`}>
@@ -291,11 +285,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         )}
 
-        {/* Outras abas */}
         {activeTab === 'plans' && (
           <div className="bg-black border border-green-900/30 rounded-xl p-6">
             <h3 className="font-bold text-green-400 mb-4">Gestão de Planos</h3>
-            <div className="text-green-500 mb-4">✅ Tabela "planos" criada com sucesso!</div>
             <p className="text-gray-400">Funcionalidade em desenvolvimento...</p>
           </div>
         )}
@@ -303,7 +295,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {activeTab === 'analytics' && (
           <div className="bg-black border border-green-900/30 rounded-xl p-6">
             <h3 className="font-bold text-green-400 mb-4">Analytics</h3>
-            <div className="text-green-500 mb-4">✅ Tabela "historico_prompts" disponível!</div>
             <p className="text-gray-400">Funcionalidade em desenvolvimento...</p>
           </div>
         )}
@@ -311,7 +302,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {activeTab === 'settings' && (
           <div className="bg-black border border-green-900/30 rounded-xl p-6">
             <h3 className="font-bold text-green-400 mb-4">Configurações do Sistema</h3>
-            <div className="text-green-500 mb-4">✅ Tabela "configuracoes" criada com sucesso!</div>
             <p className="text-gray-400">Funcionalidade em desenvolvimento...</p>
           </div>
         )}
