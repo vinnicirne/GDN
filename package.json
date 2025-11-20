@@ -26,3 +26,10 @@
     "vite": "^6.2.0"
   }
 }
+	{
+	  "scripts": {
+		"vercel-build": "tsc && vite build",
+		"build": "tsc && vite build",
+		"dev": "vite"
+	  }
+}
