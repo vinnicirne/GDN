@@ -165,76 +165,77 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  // Salvar configurações do sistema - VERSÃO COM DEBUG
-const saveSystemConfig = async () => {
-  console.log('🔄 Iniciando salvamento das configurações...');
-  
-  try {
-    // Verificar se temos conexão com Supabase
-    console.log('📡 Verificando conexão com Supabase...');
+  // Salvar configurações do sistema
+  const saveSystemConfig = async () => {
+    console.log('🔄 Iniciando salvamento das configurações...');
     
-    // Salvar cada configuração individualmente
-    const configsToSave = [
-      { 
-        chave: 'gemini', 
-        valor: systemConfig.gemini, 
-        descricao: 'Configurações da API Gemini', 
-        categoria: 'api' 
-      },
-      { 
-        chave: 'mercadopago', 
-        valor: {
-          ...systemConfig.mercadoPago,
-          webhookUrl: systemConfig.mercadoPago.webhookUrl || generateWebhookUrl()
-        }, 
-        descricao: 'Configurações do MercadoPago', 
-        categoria: 'pagamento' 
-      },
-      { 
-        chave: 'app', 
-        valor: systemConfig.app, 
-        descricao: 'Configurações da Aplicação', 
-        categoria: 'app' 
-      }
-    ];
-
-    console.log('💾 Configurações a salvar:', configsToSave);
-
-    for (const config of configsToSave) {
-      console.log(`📝 Salvando configuração: ${config.chave}`, config.valor);
+    try {
+      // Verificar se temos conexão com Supabase
+      console.log('📡 Verificando conexão com Supabase...');
       
-      const { data, error } = await supabase
-        .from('configuracoes')
-        .upsert({
-          chave: config.chave,
-          valor: config.valor,
-          descricao: config.descricao,
-          categoria: config.categoria,
-          created_at: new Date().toISOString()
-        }, {
-          onConflict: 'chave'
-        });
+      // Salvar cada configuração individualmente
+      const configsToSave = [
+        { 
+          chave: 'gemini', 
+          valor: systemConfig.gemini, 
+          descricao: 'Configurações da API Gemini', 
+          categoria: 'api' 
+        },
+        { 
+          chave: 'mercadopago', 
+          valor: {
+            ...systemConfig.mercadoPago,
+            webhookUrl: systemConfig.mercadoPago.webhookUrl || generateWebhookUrl()
+          }, 
+          descricao: 'Configurações do MercadoPago', 
+          categoria: 'pagamento' 
+        },
+        { 
+          chave: 'app', 
+          valor: systemConfig.app, 
+          descricao: 'Configurações da Aplicação', 
+          categoria: 'app' 
+        }
+      ];
 
-      if (error) {
-        console.error(`❌ Erro ao salvar ${config.chave}:`, error);
-        throw error;
-      } else {
-        console.log(`✅ ${config.chave} salvo com sucesso:`, data);
+      console.log('💾 Configurações a salvar:', configsToSave);
+
+      for (const config of configsToSave) {
+        console.log(`📝 Salvando configuração: ${config.chave}`, config.valor);
+        
+        const { data, error } = await supabase
+          .from('configuracoes')
+          .upsert({
+            chave: config.chave,
+            valor: config.valor,
+            descricao: config.descricao,
+            categoria: config.categoria,
+            created_at: new Date().toISOString()
+          }, {
+            onConflict: 'chave'
+          });
+
+        if (error) {
+          console.error(`❌ Erro ao salvar ${config.chave}:`, error);
+          throw error;
+        } else {
+          console.log(`✅ ${config.chave} salvo com sucesso:`, data);
+        }
       }
+
+      // Atualizar o appConfig no componente pai
+      console.log('🔄 Atualizando appConfig no componente pai...');
+      onUpdateAppConfig(systemConfig.app);
+
+      console.log('✅ Todas as configurações salvas com sucesso!');
+      alert('✅ Configurações salvas com sucesso!');
+
+    } catch (error) {
+      console.error('❌ Erro completo ao salvar configurações:', error);
+      alert('❌ Erro ao salvar configurações. Verifique o console para detalhes.');
     }
+  };
 
-    // Atualizar o appConfig no componente pai
-    console.log('🔄 Atualizando appConfig no componente pai...');
-    onUpdateAppConfig(systemConfig.app);
-
-    console.log('✅ Todas as configurações salvas com sucesso!');
-    alert('✅ Configurações salvas com sucesso!');
-
-  } catch (error) {
-    console.error('❌ Erro completo ao salvar configurações:', error);
-    alert('❌ Erro ao salvar configurações. Verifique o console para detalhes.');
-  }
-};
   // Testar configuração do MercadoPago
   const testMercadoPagoConfig = async () => {
     if (!systemConfig.mercadoPago.accessToken || !systemConfig.mercadoPago.publicKey) {
@@ -246,6 +247,33 @@ const saveSystemConfig = async () => {
       alert('✅ Credenciais do MercadoPago válidas!');
     } catch (error) {
       alert('❌ Erro ao testar configuração do MercadoPago');
+    }
+  };
+
+  // Testar configuração do Gemini
+  const testGeminiConfig = async () => {
+    if (!systemConfig.gemini.apiKey) {
+      alert('Por favor, configure a API Key do Gemini primeiro');
+      return;
+    }
+
+    try {
+      // Teste simples da API do Gemini
+      const response = await fetch('https://generativelanguage.googleapis.com/v1/models', {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': systemConfig.gemini.apiKey
+        }
+      });
+
+      if (response.ok) {
+        alert('✅ Conexão com Gemini API estabelecida com sucesso!');
+      } else {
+        alert('❌ Erro ao conectar com Gemini API. Verifique sua API Key.');
+      }
+    } catch (error) {
+      console.error('Erro ao testar Gemini:', error);
+      alert('❌ Erro ao testar configuração do Gemini. Verifique a conexão.');
     }
   };
 
@@ -607,14 +635,15 @@ const saveSystemConfig = async () => {
           </div>
         </div>
 
-			<div className="flex gap-4">
-	  <button 
-		onClick={testGeminiConfig}  {/* ← CORRIGIDO: testGeminiConfig */}
-		className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg transition"
-	  >
-		Testar Conexão
-	  </button>
-	</div>
+        <div className="flex gap-4">
+          <button 
+            onClick={testGeminiConfig}
+            className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg transition"
+          >
+            Testar Conexão
+          </button>
+        </div>
+      </div>
 
       {/* Configurações do MercadoPago */}
       <div className="bg-black border border-green-900/30 rounded-xl p-6 space-y-6">
