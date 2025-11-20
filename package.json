@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "vercel-build": "vite build"
+    "vercel-build": "vite build --force"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
