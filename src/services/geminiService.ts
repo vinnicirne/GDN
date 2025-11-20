@@ -1,7 +1,7 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { GeneratedNews } from '../types';
 
-// Obtém a chave API de forma segura
+// 1. Configuração da API Key
 const getApiKey = () => {
   if (typeof import.meta !== 'undefined' && import.meta.env) {
     return import.meta.env.VITE_API_KEY || import.meta.env.API_KEY;
@@ -10,10 +10,20 @@ const getApiKey = () => {
 };
 
 const apiKey = getApiKey();
-const ai = new GoogleGenAI({ apiKey: apiKey || '' });
+
+// 2. Inicialização Segura
+// Se não tiver chave, não quebra a página imediatamente, mas falhará ao tentar gerar.
+const genAI = new GoogleGenerativeAI(apiKey || 'SEM_CHAVE');
 
 export const generateNewsContent = async (theme: string, topic: string, tone: string): Promise<GeneratedNews> => {
+  if (!apiKey) {
+    throw new Error("Chave de API não configurada. Verifique o arquivo .env");
+  }
+
   const today = new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  // 3. Definição do Modelo (Usando o flash por ser rápido e barato)
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   const prompt = `
     Aja como um jornalista sénior e especialista em SEO.
@@ -29,7 +39,7 @@ export const generateNewsContent = async (theme: string, topic: string, tone: st
     4. Meta Description.
     5. Um prompt para gerar imagem de capa.
 
-    Responda APENAS com este JSON:
+    Responda ESTRITAMENTE com este JSON (sem crases ou markdown extra):
     {
       "title": "Título H1",
       "body": "Conteúdo Markdown...",
@@ -45,15 +55,16 @@ export const generateNewsContent = async (theme: string, topic: string, tone: st
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: [{ parts: [{ text: prompt }] }], // Formato corrigido para nova SDK
-    });
-
-    const responseText = response.response.text(); // Ajuste para extrair texto corretamente
+    // 4. Geração do Conteúdo
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
     
-    // Limpeza do JSON (remove crases se existirem)
-    let cleanText = responseText.replace(/```json/g, "").replace(/```/g, "").trim();
+    // 5. Limpeza e Parse do JSON
+    // Removemos blocos de código markdown que a IA possa colocar (```json ... ```)
+    let cleanText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    
+    // Garante que pegamos apenas o objeto JSON (caso haja texto antes ou depois)
     const firstBrace = cleanText.indexOf('{');
     const lastBrace = cleanText.lastIndexOf('}');
     if (firstBrace !== -1 && lastBrace !== -1) {
@@ -62,14 +73,13 @@ export const generateNewsContent = async (theme: string, topic: string, tone: st
 
     const parsedContent: GeneratedNews = JSON.parse(cleanText);
 
-    // Adiciona fontes vazias se a IA não retornar (para evitar erro de tipo)
     return {
       ...parsedContent,
-      sources: [] 
+      sources: [] // O modelo 1.5 Flash padrão não retorna fontes da web da mesma forma
     };
     
   } catch (error) {
     console.error("Erro na IA:", error);
-    throw new Error("Falha ao gerar notícia com a IA.");
+    throw new Error("Falha ao gerar notícia. Tente novamente ou verifique seus créditos de API.");
   }
 };
