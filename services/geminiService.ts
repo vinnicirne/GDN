@@ -1,94 +1,105 @@
-import { GoogleGenAI } from "@google/genai";
+// services/geminiService.ts - CORREÇÃO
+import { GoogleGenerativeAI } from "@google/generative-ai"; // CORREÇÃO: Import correto
 import { supabase } from './supabase';
 import type { GeneratedNews } from '../types';
 
-const getApiKey = () => {
-  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-    return process.env.API_KEY;
-  }
-  if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
-    return (import.meta as any).env.VITE_API_KEY || (import.meta as any).env.API_KEY;
-  }
-  return '';
-};
+// CORREÇÃO: Função para obter API Key do banco
+const getApiKey = async (): Promise<string> => {
+  try {
+    const { data, error } = await supabase
+      .from('configuracoes')
+      .select('valor')
+      .eq('chave', 'gemini')
+      .single();
 
-const apiKey = getApiKey();
-const ai = new GoogleGenAI({ apiKey: apiKey || '' });
+    if (error || !data) {
+      throw new Error('API Key do Gemini não configurada');
+    }
+
+    return data.valor.apiKey || '';
+  } catch (error) {
+    console.error('Erro ao buscar API Key:', error);
+    return '';
+  }
+};
 
 export const generateNewsArticle = async (theme: string, topic: string, tone: string): Promise<GeneratedNews> => {
   
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) {
-      throw new Error("Usuário não autenticado. Faça login para continuar.");
+    throw new Error("Usuário não autenticado. Faça login para continuar.");
   }
 
+  // Verificar créditos
   const { data: userProfile, error: profileError } = await supabase
-      .from('usuarios')
-      .select('creditos_saldo')
-      .eq('id', user.id)
-      .single();
+    .from('usuarios')
+    .select('creditos_saldo')
+    .eq('id', user.id)
+    .single();
 
   if (profileError || !userProfile) {
-      throw new Error("Erro ao verificar saldo da conta.");
+    throw new Error("Erro ao verificar saldo da conta.");
   }
 
   if (userProfile.creditos_saldo <= 0) {
-      throw new Error("Saldo insuficiente. Por favor, recarregue seus créditos.");
+    throw new Error("Saldo insuficiente. Por favor, recarregue seus créditos.");
   }
 
-  const today = new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  // CORREÇÃO: Obter API Key do banco
+  const apiKey = await getApiKey();
+  if (!apiKey) {
+    throw new Error("API Key do Gemini não configurada no sistema.");
+  }
 
-  const prompt = `[PROMPT COMPLETO DO GEMINI AQUI]`;
+  // CORREÇÃO: Usar GoogleGenerativeAI correto
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+  const prompt = `[SEU PROMPT AQUI]`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: prompt,
-      config: {
-        tools: [{googleSearch: {}}],
-      }
-    });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
 
-    const responseText = response.text;
+    // Processar resposta...
     let parsedContent: GeneratedNews;
     
     try {
-        let cleanText = responseText.trim();
-        const firstBrace = cleanText.indexOf('{');
-        const lastBrace = cleanText.lastIndexOf('}');
-        if (firstBrace !== -1 && lastBrace !== -1) {
-            cleanText = cleanText.substring(firstBrace, lastBrace + 1);
-        }
-        parsedContent = JSON.parse(cleanText);
+      let cleanText = text.trim();
+      const firstBrace = cleanText.indexOf('{');
+      const lastBrace = cleanText.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        cleanText = cleanText.substring(firstBrace, lastBrace + 1);
+      }
+      parsedContent = JSON.parse(cleanText);
     } catch (e) {
-        throw new Error("Erro ao processar resposta da IA.");
+      throw new Error("Erro ao processar resposta da IA.");
     }
 
-    // CORREÇÃO AQUI: créditos_saldo (não creditors.saldo)
+    // Atualizar créditos
     const newBalance = userProfile.creditos_saldo - 1;
     
     await supabase
-        .from('usuarios')
-        .update({ creditos_saldo: newBalance })
-        .eq('id', user.id);
+      .from('usuarios')
+      .update({ creditos_saldo: newBalance })
+      .eq('id', user.id);
 
-    // Salva histórico
+    // Salvar histórico
     await supabase
-        .from('historico_prompts')
-        .insert([{
-            user_id: user.id,
-            prompt_text: `${theme} - ${topic} (${tone})`,
-            response_json: parsedContent,
-            timestamp: new Date().toISOString()
-        }]);
+      .from('historico_prompts')
+      .insert([{
+        user_id: user.id,
+        prompt_text: `${theme} - ${topic} (${tone})`,
+        response_json: parsedContent,
+        timestamp: new Date().toISOString()
+      }]);
 
     return parsedContent;
     
   } catch (error) {
-    if (error instanceof Error) {
-        throw error;
-    }
-    throw new Error("Falha ao gerar notícia.");
+    console.error('Erro no Gemini:', error);
+    throw new Error("Falha ao gerar notícia. Tente novamente.");
   }
 };
