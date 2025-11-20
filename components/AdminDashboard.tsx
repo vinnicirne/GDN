@@ -20,7 +20,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'users' | 'plans' | 'payments' | 'api' | 'settings'>('users');
   const [users, setUsers] = useState<User[]>([]);
-  const [plans, setPlans] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [systemConfig, setSystemConfig] = useState<SystemConfig>(configService.getDefaultConfig());
   const [isSaving, setIsSaving] = useState(false);
@@ -486,17 +485,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     className="w-full bg-yellow-600 hover:bg-yellow-500 py-3 rounded-lg text-white font-medium transition"
                   >
                     🔄 Restaurar Padrões
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      if (confirm('Isso irá reiniciar todas as configurações. Continuar?')) {
-                        setSystemConfig(configService.getDefaultConfig());
-                      }
-                    }}
-                    className="w-full bg-red-600 hover:bg-red-500 py-3 rounded-lg text-white font-medium transition"
-                  >
-                    🗑️ Limpar Tudo
                   </button>
                 </div>
               </div>
