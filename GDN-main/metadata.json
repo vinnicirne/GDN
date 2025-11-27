@@ -1,0 +1,5 @@
+{
+  "name": "Gerador de Notícias",
+  "description": "Um aplicativo que gera notícias diárias sobre fatos recentes e cria análises preditivas sobre eventos futuros (esportes, política, economia).",
+  "requestFramePermissions": []
+}

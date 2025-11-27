@@ -1,90 +1,153 @@
-
 import React from 'react';
-import type { AppConfig } from '../types.ts';
+import { UserRole } from '../types';
 
 interface HeaderProps {
-  credits: number;
-  onOpenPro: () => void;
-  onOpenDocs: () => void;
-  onOpenProfile: () => void;
-  appConfig: AppConfig;
+  userEmail?: string;
+  onLogout?: () => void;
+  isAdmin?: boolean;
+  onNavigateToAdmin?: () => void;
+  onNavigateToDashboard?: () => void;
+  onNewUserClick?: () => void; // Added to trigger the create user modal
+  pageTitle?: string;
+  userCredits?: number;
+  userRole?: UserRole;
 }
 
-const Header: React.FC<HeaderProps> = ({ credits, onOpenPro, onOpenDocs, onOpenProfile, appConfig }) => {
-  return (
-    <header className="w-full border-b border-green-900/30 bg-black/80 backdrop-blur-md sticky top-0 z-30 shadow-[0_1px_15px_rgba(0,255,0,0.05)]">
-      <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3 md:gap-8">
+export const Header: React.FC<HeaderProps> = ({ userEmail, onLogout, isAdmin, onNavigateToAdmin, onNavigateToDashboard, onNewUserClick, pageTitle, userCredits, userRole }) => {
+  const isAdminView = !!onNavigateToDashboard;
+
+  if (isAdminView) {
+    // New Admin Header Layout
+    return (
+      <header className="bg-black/80 backdrop-blur-md border-b border-green-500/30 sticky top-0 z-10 text-sm">
+        {/* Top bar for user info and system status */}
+        <div className="container mx-auto px-4 py-2 flex justify-between items-center border-b border-green-900/20">
+          <div className="flex items-center space-x-4">
+            <span className="text-gray-400">Admin:</span>
+            <span className="font-bold text-white">{userEmail}</span>
+            <span className="px-2 py-0.5 bg-green-900/50 text-green-300 text-xs rounded-full capitalize">{userRole?.replace('_', ' ')}</span>
+          </div>
+          <div className="flex items-center space-x-6">
+            {/* Status Badges */}
+            <div className="flex items-center space-x-1.5 text-xs text-gray-500" title="Versão do Sistema">
+              <i className="fas fa-code-branch"></i>
+              <span className="font-semibold text-gray-400">v1.0.3</span>
+            </div>
+            <div className="flex items-center space-x-1.5 text-xs text-gray-500" title="Ambiente">
+              <i className="fas fa-server text-blue-400"></i>
+              <span>Produção</span>
+            </div>
+            <div className="flex items-center space-x-1.5 text-xs text-gray-500" title="Status do Sistema">
+              <div className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              </div>
+              <span>Online</span>
+            </div>
+          </div>
+        </div>
         
-        {/* Lado Esquerdo: Título e Descrição / Logo */}
-        <div className="flex-1 min-w-0 flex items-center gap-3">
-          {appConfig.logoUrl ? (
-              <img 
-                src={appConfig.logoUrl} 
-                alt={appConfig.appName} 
-                className="h-8 md:h-10 object-contain"
-              />
-          ) : null}
-          
-          <div className="flex flex-col justify-center">
-            <h1 className={`text-xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600 truncate pr-2 tracking-tight ${appConfig.logoUrl ? 'hidden md:block' : ''}`}>
-              {appConfig.appName || 'Gerador de Notícias'}
+        {/* Bottom bar for title, navigation and quick actions */}
+        <div className="container mx-auto px-4 py-3 flex justify-between items-center">
+          <div>
+             <h1 className="text-xl font-bold tracking-widest">
+                <span className="text-gray-200">GDN_IA</span>
+                <span className="text-green-400/80"> / {pageTitle}</span>
             </h1>
-            {!appConfig.logoUrl && (
-                <p className="text-gray-500 text-xs md:text-sm mt-0.5 hidden md:block truncate font-mono">
-                    Inteligência Artificial & Análise Preditiva
-                </p>
+          </div>
+          <div className="flex items-center space-x-3">
+            {/* Quick Actions */}
+            <button 
+              onClick={onNewUserClick}
+              className="bg-green-600/80 text-black px-3 py-1.5 rounded-lg hover:bg-green-500 transition-colors duration-200 text-xs font-semibold border border-green-500/50"
+            >
+              <i className="fas fa-plus mr-2"></i>
+              Novo Usuário
+            </button>
+
+            {/* Navigation */}
+            {onNavigateToDashboard && (
+                 <button
+                  onClick={onNavigateToDashboard}
+                  className="bg-gray-700/50 text-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-600 hover:text-white transition-colors duration-200 text-xs font-semibold border border-gray-600"
+                  title="Voltar para o Dashboard"
+                >
+                  <i className="fas fa-arrow-left mr-2"></i>
+                  Dashboard
+                </button>
+            )}
+
+            {onLogout && (
+                 <button
+                    onClick={onLogout}
+                    className="bg-red-600/50 text-white px-3 py-1.5 rounded-lg hover:bg-red-500 transition-colors duration-200 text-xs font-semibold border border-red-500"
+                    title="Sair"
+                >
+                    <i className="fas fa-sign-out-alt mr-2"></i>
+                    Sair
+                </button>
             )}
           </div>
         </div>
+      </header>
+    );
+  }
 
-        {/* Lado Direito: Ações (Docs, Créditos, Pro, Perfil) */}
-        <div className="flex items-center gap-2 sm:gap-4 md:gap-6 shrink-0">
-          
-          {/* Botão Docs */}
-          <button 
-            onClick={onOpenDocs}
-            className="flex items-center gap-1.5 text-gray-400 hover:text-green-400 text-sm font-medium transition-colors px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg hover:bg-green-900/20 border border-transparent hover:border-green-900/50"
-            title="Documentação do Sistema"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-            </svg>
-            <span className="hidden sm:inline">Docs</span>
-          </button>
-
-          {/* Separador Vertical */}
-          <div className="h-5 w-px bg-gray-800 hidden sm:block"></div>
-
-          {/* Contador de Créditos */}
-          <div className="flex flex-col items-end">
-            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Créditos</span>
-            <span className={`font-mono font-bold text-sm leading-none ${credits === 0 ? 'text-red-500' : 'text-green-400'}`}>
-              {credits}/3
-            </span>
-          </div>
-          
-          {/* Ícone de Perfil / Conta */}
-          <button
-            onClick={onOpenProfile}
-            className="p-2 rounded-full text-gray-400 hover:text-green-400 hover:bg-green-900/20 transition-colors"
-            title="Minha Conta"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
-
-          {/* Botão PRO */}
-          <button 
-            onClick={onOpenPro}
-            className="bg-green-600 hover:bg-green-500 text-black text-xs sm:text-sm font-bold py-2 px-3 sm:px-4 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.4)] transition-all transform hover:scale-105 whitespace-nowrap border border-green-400"
-          >
-            👑 <span className="hidden sm:inline">Seja </span>PRO
-          </button>
+  // Original Dashboard Header Layout
+  return (
+    <header className="bg-black/80 backdrop-blur-md border-b border-green-500/30 sticky top-0 z-10">
+      <div className="container mx-auto px-4 py-4 flex justify-between items-center relative">
+        <div className="text-center flex-grow">
+          <h1 className="text-3xl md:text-4xl font-bold tracking-widest">
+            <span className="text-gray-200">GDN</span>
+            <span className="text-green-400">_IA</span>
+          </h1>
+          <p className="text-center text-green-400/80 mt-1 text-sm md:text-base">{pageTitle || 'Seu Gerador de Notícias Inteligente'}</p>
+        </div>
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center space-x-4">
+          {userCredits !== undefined && (
+             <div className="hidden md:flex items-center space-x-2 border border-green-700/30 bg-black/30 px-3 py-1 rounded-full text-sm">
+              <i className="fas fa-coins text-yellow-400"></i>
+              <span className="font-bold text-white">
+                {userCredits === -1 ? '∞' : userCredits}
+              </span>
+              <span className="text-gray-400 text-xs">Créditos</span>
+            </div>
+          )}
+          {isAdmin && onNavigateToAdmin && (
+             <button
+              onClick={onNavigateToAdmin}
+              className="bg-green-600/80 text-black px-3 py-2 rounded-lg hover:bg-green-500 transition-colors duration-200 text-sm font-semibold border border-green-500/50"
+              title="Painel Admin"
+            >
+              <i className="fas fa-user-shield"></i>
+               <span className="hidden md:inline ml-2">Admin</span>
+            </button>
+          )}
+           {onNavigateToDashboard && (
+             <button
+              onClick={onNavigateToDashboard}
+              className="bg-gray-700/50 text-gray-300 px-3 py-2 rounded-lg hover:bg-gray-600 hover:text-white transition-colors duration-200 text-sm font-semibold border border-gray-600"
+              title="Voltar para o Dashboard"
+            >
+              <i className="fas fa-arrow-left"></i>
+               <span className="hidden md:inline ml-2">Dashboard</span>
+            </button>
+          )}
+          {userEmail && onLogout && (
+            <>
+              <button
+                onClick={onLogout}
+                className="bg-red-600/50 text-white px-3 py-2 rounded-lg hover:bg-red-500 transition-colors duration-200 text-sm font-semibold border border-red-500"
+                title="Sair"
+              >
+                <i className="fas fa-sign-out-alt"></i>
+                <span className="hidden md:inline ml-2">Sair</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
     </header>
   );
 };
-
-export default Header;
