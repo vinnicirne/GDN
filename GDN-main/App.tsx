@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
-import Header from './components/Header';
-import NewsGeneratorForm from './components/NewsGeneratorForm';
+import Header from './components/Header.tsx';
+import NewsGeneratorForm from './components/NewsGeneratorForm.tsx';
 import UpgradeModal from './components/UpgradeModal';
 import CheckoutModal from './components/CheckoutModal';
 import Documentation from './components/Documentation';
@@ -16,6 +15,12 @@ import type { GeneratedNews, PlanConfig, AppConfig, User } from './types';
 import { NEWS_THEMES, NEWS_TONES } from './constants';
 
 // --- CONSTANTS ---
+
+// No início do App.tsx, depois dos imports
+console.log('=== SUPABASE DEBUG ===');
+console.log('Supabase object:', supabase);
+console.log('Supabase URL:', supabase?.supabaseUrl);
+console.log('isConfigured:', isSupabaseConfigured());
 
 const INITIAL_PLANS: PlanConfig[] = [
   { 
@@ -277,6 +282,26 @@ const App: React.FC = () => {
 
       <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-8 md:py-12 flex flex-col gap-8">
         
+        {/* Intro Section */}
+        <div className="text-center space-y-4 animate-fade-in-down">
+          <h2 className="text-4xl md:text-6xl font-bold tracking-tighter text-white">
+            Notícias com <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600">IA & SEO</span>
+          </h2>
+          <p className="text-lg md:text-xl text-gray-500 max-w-2xl mx-auto">
+            Gere artigos otimizados para Rank Math e Yoast em segundos. Escolha o tema, o tom e deixe a inteligência artificial trabalhar.
+          </p>
+          {!user && (
+             <div className="flex justify-center gap-4 pt-2">
+                <button onClick={() => setCurrentView('login')} className="text-sm font-bold text-green-400 border border-green-900/50 px-4 py-2 rounded-full hover:bg-green-900/20 transition">
+                   Login
+                </button>
+                <button onClick={() => setCurrentView('register')} className="text-sm font-bold text-white bg-green-900/20 border border-green-900/50 px-4 py-2 rounded-full hover:bg-green-900/40 transition">
+                   Cadastrar
+                </button>
+             </div>
+          )}
+        </div>
+
         {/* Main Form */}
         <div className="bg-gray-900/20 backdrop-blur-sm border border-green-900/30 rounded-2xl p-6 md:p-8 shadow-2xl shadow-green-900/10">
           <NewsGeneratorForm

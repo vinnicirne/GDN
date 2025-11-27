@@ -1,4 +1,3 @@
-
 export interface GeneratedNews {
   id?: string;
   title: string;
@@ -47,4 +46,27 @@ export interface User {
   avatar?: string;
   status?: string;
   created_at?: string;
+}
+
+export interface MercadoPagoConfig {
+  accessToken: string;
+  publicKey: string;
+  webhookUrl: string;
+  enabled: boolean;
+}
+
+export interface GeminiConfig {
+  apiKey: string;
+  model: string;
+  maxTokens: number;
+  temperature: number;
+  enabled: boolean;
+}
+
+export interface SystemConfig {
+  id?: string;
+  mercadoPago: MercadoPagoConfig;
+  gemini: GeminiConfig;
+  app: AppConfig;
+  updatedAt?: string;
 }
