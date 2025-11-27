@@ -1,5 +1,5 @@
 {
-  "name": "gdn_ia",
+  "name": "gerador-de-notícias",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,12 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react-dom": "^18.3.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "@google/genai": "^1.30.0",
-    "react": "^18.3.0",
-    "@supabase/supabase-js": "2",
-    "recharts": "2",
-    "uuid": "latest"
+    "@supabase/supabase-js": "^2.83.0",
+    "dotenv": "^17.2.3"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

@@ -1,113 +1,195 @@
 
-import { GoogleGenAI, Modality } from "@google/genai";
-import { CreatorSuiteMode } from '../types';
-import { getUserPreferences, saveGenerationResult } from './memoryService';
+import { GoogleGenAI } from "@google/genai";
+import type { GeneratedNews } from '../types';
 
-if (!process.env.API_KEY) {
-  throw new Error("API_KEY environment variable not set");
-}
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-const CREATOR_SUITE_SYSTEM_PROMPT = `
-Você é o GDN_IA Creator Suite, uma ferramenta multifuncional para geração de conteúdo criativo e produtivo. Detecte o modo da query do usuário e responda APENAS no modo correto. Sempre em português brasileiro, estruturado e acionável. Use buscas reais se relevante (ex: para landing pages, busque templates atuais).
-
-MODOS DISPONÍVEIS (roteie baseado na query):
-
-1. **GDN Notícias** (default se não especificado): Siga regras antigas de notícias/preditivas com score de qualidade.
-
-2. **Gerador de Prompts**: Para apps, sistemas, slides, docs etc. Gere prompts otimizados para IAs como Gemini/ChatGPT. Estrutura: Título do Prompt | Descrição | Prompt Pronto | Dicas de Uso | Exemplos de Output Esperado.
-
-3. **Gerador de Landing Page Poderosa**: GERE UM ARQUIVO HTML COMPLETO E ÚNICO. Use Tailwind CSS via CDN (<script src="https://cdn.tailwindcss.com"></script>). Crie uma página de vendas visualmente atraente e responsiva (mobile-first). Inclua seções: Hero (com título forte e CTA), Features/Benefícios (com ícones), Prova Social (depoimentos), Oferta (detalhes do produto/preço) e um Footer simples. O código deve ser limpo e pronto para ser salvo em um arquivo .html e funcionar. A resposta DEVE ser apenas o código HTML, começando com <!DOCTYPE html>.
-
-4. **Gerador de Copy**: Textos persuasivos para ads, emails, posts. Foque em AIDA (Atenção, Interesse, Desejo, Ação). Estrutura: Título da Copy | Versões (Curta/Média/Longa) | Variações A/B | Métricas de Engajamento Estimadas.
-
-5. **Gerador de Estrutura para Arte**: Para Canva, Corel, Photoshop. Descreva layers, composições, cores, tipografia. Estrutura: Briefing Visual | Passos de Criação | Paleta de Cores (hex) | Assets Sugeridos | Export Tips.
-
-REGRAS GERAIS PARA TODOS OS MODOS:
-
-- Para buscas: Use contexto da web se aplicável (ex: tendências 2025 para landing pages).
-
-- Estrutura de Resposta (Exceto Landing Page): **Modo Detectado:** [Nome] | **Output Principal:** [Conteúdo] | **Dicas Extras:** [Lista].
-
-Query do usuário: {prompt}
-
-Gere no modo correto!
-`;
-
-export const generateCreativeContent = async (
-    prompt: string, 
-    mode: CreatorSuiteMode, 
-    userId?: string,
-    generateAudio?: boolean
-): Promise<{ text: string, audioBase64: string | null }> => {
-  const modelName = 'gemini-2.5-flash';
-  
-  let userMemory = '';
-  if (userId) {
-    userMemory = await getUserPreferences(userId);
+// Função auxiliar para obter a API Key de forma segura em diferentes ambientes (Vite, Next, CRA, etc)
+const getApiKey = () => {
+  // Tenta processo padrão (Node/CRA)
+  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+    return process.env.API_KEY;
   }
+  // Tenta Vite (import.meta.env)
+  if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
+    return (import.meta as any).env.VITE_API_KEY || (import.meta as any).env.API_KEY;
+  }
+  return '';
+};
 
-  const systemPromptWithMemory = `${CREATOR_SUITE_SYSTEM_PROMPT}\n\nPreferências e feedbacks anteriores deste usuário (use para personalizar a resposta):\n${userMemory}`;
+const apiKey = getApiKey();
 
-  const fullPrompt = `
-    Query do usuário: ${prompt}
-    Modo de Geração: ${mode}
+// Inicializa com a chave obtida de forma segura.
+// Removemos o fallback direto para process.env.API_KEY no construtor para evitar ReferenceError na Vercel.
+const ai = new GoogleGenAI({ apiKey: apiKey || '' });
+
+// --- Analytics Helper ---
+const logAnalytics = (data: { 
+  theme: string; 
+  tone: string; 
+  success: boolean; 
+  latencyMs: number; 
+  tokens?: number 
+}) => {
+  try {
+    const existing = localStorage.getItem('news_app_analytics');
+    const logs = existing ? JSON.parse(existing) : [];
+    logs.push({
+      ...data,
+      timestamp: Date.now(),
+    });
+    // Keep only last 100 logs to prevent storage overflow in demo
+    if (logs.length > 100) logs.shift();
+    localStorage.setItem('news_app_analytics', JSON.stringify(logs));
+  } catch (e) {
+    console.warn("Analytics storage failed", e);
+  }
+};
+
+export const generateNewsArticle = async (theme: string, topic: string, tone: string): Promise<GeneratedNews> => {
+  const startTime = performance.now();
+  
+  const today = new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  const prompt = `
+    Aja como um jornalista sênior e especialista em SEO (Rank Math/Yoast).
+    
+    CONTEXTO TEMPORAL: Hoje é ${today}. Considere esta data para termos como "ontem", "hoje" ou "semana passada".
+    TOM DE VOZ EXIGIDO: ${tone}. Adapte o vocabulário e a estrutura das frases para este estilo.
+
+    Sua missão é escrever um artigo viral e tecnicamente perfeito para SEO.
+    
+    --- 1. DEFINIÇÃO DA ESTRATÉGIA (Mentalmente) ---
+    Antes de escrever, defina uma "Palavra-chave de Foco" (Focus Keyword).
+    Exemplo: Se o tema é "Vitória do Flamengo", a palavra-chave pode ser "Flamengo vence".
+    
+    --- 2. REGRAS OBRIGATÓRIAS DE SEO (CRÍTICO - NÃO IGNORE) ---
+    Para obter pontuação máxima no Rank Math, você DEVE seguir estas regras estritas:
+    
+    A. A "Palavra-chave de Foco" DEVE aparecer EXATAMENTE (ipsis litteris) nos seguintes lugares:
+       1. No Título H1.
+       2. No Slug (URL amigável).
+       3. Na Meta Description.
+       4. **CRUCIAL**: Na PRIMEIRA FRASE do primeiro parágrafo do texto. O texto deve começar já abordando a palavra-chave.
+       5. Em pelo menos um subtítulo (H2).
+       
+    B. Densidade: A palavra-chave deve aparecer naturalmente ao longo do texto (aprox 1-2%).
+
+    --- 3. CONTEÚDO ---
+    Analise o input:
+    Tema: ${theme}
+    ${topic ? `Tópico Específico: ${topic}` : ''}
+    
+    - Se for notícia recente: Reporte fatos, dados e citações.
+    - Se for futuro/tendência: Faça uma análise preditiva.
+    - Use Markdown: **Negrito**, ## H2, - Listas, 1. Listas numeradas.
+    - Mínimo de 450 palavras.
+
+    --- 4. TÍTULO E META ---
+    - SEO Title: Clickbait saudável (ou agressivo, dependendo do Tom).
+    - Slug: Curto, minúsculas e hífens.
+    - Meta Description: Resumo instigante de até 160 caracteres contendo a palavra-chave.
+
+    --- 5. VISUAL ---
+    Crie um "imagePrompt" em inglês detalhado para gerar uma capa realista e cinematográfica.
+
+    --- FORMATO DE RESPOSTA (JSON APENAS) ---
+    Responda APENAS com este JSON válido:
+    {
+      "title": "H1 da Notícia",
+      "body": "Conteúdo em Markdown...",
+      "imagePrompt": "Detailed prompt in English...",
+      "seo": {
+        "focusKeyword": "A palavra-chave exata",
+        "seoTitle": "Título SEO",
+        "slug": "slug-com-a-palavra-chave",
+        "metaDescription": "Descrição...",
+        "tags": ["tag1", "tag2"]
+      }
+    }
   `;
 
-  let config: any = {
-    systemInstruction: systemPromptWithMemory
-  };
-  
-  if (mode === 'news') {
-     config.tools = [{ googleSearch: {} }];
-  }
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        tools: [{googleSearch: {}}],
+      }
+    });
 
-  const response = await ai.models.generateContent({
-    model: modelName,
-    contents: fullPrompt,
-    config: config,
-  });
-
-  const text = response.text;
-
-  if (!text) {
-    throw new Error('A API não retornou conteúdo de texto.');
-  }
-
-  let audioBase64: string | null = null;
-  // A geração de áudio só faz sentido para o modo de notícias
-  if (generateAudio && mode === 'news') {
+    const responseText = response.text;
+    let parsedContent: GeneratedNews;
+    
     try {
-        console.log("Generating audio for news content...");
-        const audioResponse = await ai.models.generateContent({
-            model: "gemini-2.5-flash-preview-tts",
-            contents: [{ parts: [{ text: text }] }], // Gera áudio do texto completo retornado
-            config: {
-                responseModalities: [Modality.AUDIO],
-                speechConfig: {
-                    voiceConfig: {
-                      prebuiltVoiceConfig: { voiceName: 'Kore' },
-                    },
-                },
-            },
-        });
-        
-        const base64Audio = audioResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-        if (base64Audio) {
-            audioBase64 = base64Audio;
-            console.log("Audio generated successfully.");
-        } else {
-            console.warn("TTS API call succeeded but no audio data was returned.");
-        }
-    } catch (audioError) {
-        console.error("Failed to generate audio:", audioError);
-    }
-  }
+        // First attempt: direct parse
+        parsedContent = JSON.parse(responseText);
+    } catch (e) {
+        // Second attempt: clean markdown code blocks
+        let cleanText = responseText
+            .replace(/^```json\s*/, "")
+            .replace(/^```\s*/, "")
+            .replace(/\s*```$/, "")
+            .trim();
 
-  if (userId) {
-    saveGenerationResult(userId, `Modo: ${mode}\nPrompt: ${prompt}\nResultado: ${text}`);
+        try {
+            parsedContent = JSON.parse(cleanText);
+        } catch (e2) {
+             // Third attempt: Extract JSON object from mixed text
+             const firstBrace = cleanText.indexOf('{');
+             const lastBrace = cleanText.lastIndexOf('}');
+             
+             if (firstBrace !== -1 && lastBrace !== -1) {
+                try {
+                    const extractedJson = cleanText.substring(firstBrace, lastBrace + 1);
+                    parsedContent = JSON.parse(extractedJson);
+                } catch (finalErr) {
+                    console.error("Failed extracting JSON:", responseText);
+                    throw new Error("A resposta da IA não retornou um JSON válido. Tente novamente.");
+                }
+             } else {
+                 console.error("Raw response:", responseText);
+                 throw new Error("A resposta da IA não retornou um JSON válido. Tente novamente.");
+             }
+        }
+    }
+
+    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [];
+    const sources = groundingChunks
+      .map((chunk: any) => chunk.web)
+      .filter(Boolean) 
+      .map((webChunk: any) => ({
+          uri: webChunk.uri,
+          title: webChunk.title,
+      }))
+      .filter((source: any, index: number, self: any[]) => 
+          index === self.findIndex((s) => s.uri === source.uri)
+      );
+
+    // Log Success
+    logAnalytics({
+        theme,
+        tone,
+        success: true,
+        latencyMs: performance.now() - startTime
+    });
+
+    return {
+      ...parsedContent,
+      sources,
+    };
+    
+  } catch (error) {
+    // Log Error
+    logAnalytics({
+        theme,
+        tone,
+        success: false,
+        latencyMs: performance.now() - startTime
+    });
+
+    console.error("Error calling Gemini API:", error);
+    if (error instanceof Error) {
+        throw new Error(`Falha ao gerar notícia: ${error.message}`);
+    }
+    throw new Error("Falha ao gerar notícia: um erro desconhecido ocorreu.");
   }
-  
-  return { text, audioBase64 };
 };

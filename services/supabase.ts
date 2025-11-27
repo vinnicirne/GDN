@@ -1,26 +1,16 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js';
 
-// VITE: Usar import.meta.env diretamente
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-
-// Validação para build
-if (!supabaseUrl || !supabaseKey) {
-  console.warn('Variáveis de ambiente do Supabase não encontradas')
-}
-
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co', 
-  supabaseKey || 'placeholder',
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true
+const getEnvVar = (key: string, viteKey: string) => {
+    if (typeof process !== 'undefined' && process.env && process.env[key]) {
+        return process.env[key];
     }
-  }
-)
+    if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
+        return (import.meta as any).env[viteKey] || (import.meta as any).env[key];
+    }
+    return '';
+};
 
-export const isSupabaseConfigured = () => {
-  return !!supabaseUrl && !!supabaseKey && supabaseUrl !== 'https://placeholder.supabase.co'
-}
+const supabaseUrl = getEnvVar('REACT_APP_SUPABASE_URL', 'VITE_SUPABASE_URL');
+const supabaseKey = getEnvVar('REACT_APP_SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY');
+
+export const supabase = createClient(supabaseUrl, supabaseKey);

@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { NEWS_THEMES, NEWS_TONES } from '../constants.ts';
+import { NEWS_THEMES, NEWS_TONES } from '../constants';
 
 interface NewsGeneratorFormProps {
   theme: string;
@@ -91,26 +92,26 @@ const NewsGeneratorForm: React.FC<NewsGeneratorFormProps> = ({
       </form>
 
       {isLimitReached ? (
-        <div className="bg-black border border-red-900/50 rounded-xl p-8 text-center shadow-[0_0_30px_rgba(220,38,38,0.15)] relative overflow-hidden animate-fade-in">
-           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-red-900"></div>
+        <div className="bg-black border border-red-900/50 rounded-xl p-6 text-center shadow-[0_0_20px_rgba(220,38,38,0.1)] relative overflow-hidden animate-fade-in">
+           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-red-800"></div>
            
-           <div className="mb-4 inline-block p-3 bg-red-900/20 rounded-full">
-             <span className="text-3xl">🛑</span>
+           <div className="mb-4">
+             <span className="text-4xl">🛑</span>
            </div>
            
-           <h3 className="text-2xl font-bold text-white mb-3">Créditos Esgotados!</h3>
-           <p className="text-gray-400 mb-8 max-w-md mx-auto text-sm leading-relaxed">
+           <h3 className="text-xl font-bold text-white mb-2">Créditos Esgotados!</h3>
+           <p className="text-gray-400 mb-6 max-w-md mx-auto">
              {isLoggedIn 
-                ? "Você utilizou todos os seus créditos de hoje. Atualize seu plano para continuar gerando notícias sem interrupções."
+                ? "Você utilizou todos os seus créditos de hoje. Faça um upgrade para continuar gerando."
                 : "Seu saldo de créditos gratuitos acabou. Para gerar mais notícias, faça login ou cadastre-se para adquirir um plano."
              }
            </p>
            
-           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center w-full sm:w-auto">
+           <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
               <button
                  type="button"
                  onClick={onOpenPro}
-                 className="w-full sm:w-auto font-bold py-3.5 px-8 rounded-lg transition-all transform hover:scale-105 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-lg shadow-green-900/20 border border-green-500/50 uppercase tracking-wide text-xs"
+                 className="w-full sm:w-auto font-bold py-3 px-8 rounded-full transition-all transform hover:scale-105 bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-500 hover:to-emerald-600 text-white shadow-[0_0_15px_rgba(34,197,94,0.3)] border border-green-500"
                >
                  Comprar Créditos Agora
                </button>
@@ -119,7 +120,7 @@ const NewsGeneratorForm: React.FC<NewsGeneratorFormProps> = ({
                  <button
                    type="button"
                    onClick={onLoginRequired}
-                   className="w-full sm:w-auto font-bold py-3.5 px-8 rounded-lg transition-all hover:bg-gray-900 text-gray-300 border border-gray-700 hover:border-gray-500 hover:text-white uppercase tracking-wide text-xs"
+                   className="w-full sm:w-auto font-bold py-3 px-8 rounded-full transition-all hover:bg-gray-900 text-gray-300 border border-gray-600 hover:border-gray-400 hover:text-white"
                  >
                    Já Sou Cliente (Login)
                  </button>

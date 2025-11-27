@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
-import { authService } from '../services/authService.ts';
-import type { User } from '../types.ts';
+import { authService } from '../services/authService';
+import type { User } from '../types';
 
 interface LoginProps {
   onLoginSuccess: (user: User) => void;
@@ -21,14 +22,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onGoToRegister, onBack })
     setError(null);
 
     try {
-      // Authenticate using Supabase
-      const user = await authService.login(email, password);
-      
-      // Check for Admin privileges if in Admin Mode
-      if (isAdminMode && user.role !== 'admin') {
-          throw new Error('Acesso negado: Credenciais sem privilégios de Super Admin.');
-      }
-
+      const user = await authService.login(email, password, isAdminMode ? 'admin' : 'user');
       onLoginSuccess(user);
     } catch (err) {
       if (err instanceof Error) {
